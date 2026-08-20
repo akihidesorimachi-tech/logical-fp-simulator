@@ -2,7 +2,7 @@
 
 LOGICAL FP は、インフレと名目固定の公的年金を考慮して老後必要資金を計算し、複数資産の将来価値とアセットアロケーションを可視化する、ブラウザ完結型のシミュレーションツールです。
 
-**公開URL:** https://akihidesorimachi-tech.github.io/logical-fp-simulator/
+**公開URL:** https://simulator.logicalfp.pro/
 
 ## 起動方法
 
@@ -22,9 +22,15 @@ pnpm build
 
 ビルド結果は `dist/public/` に出力されます。`pnpm start` を実行すると、Express がSPA用フォールバックを含めて配信します。
 
-## 公開(GitHub Pages)
+## 公開(GitHub Pages + カスタムドメイン)
 
-`main` ブランチへの push で `.github/workflows/deploy.yml` が自動的に `pnpm build` を実行し、GitHub Pages（プロジェクトページ `/logical-fp-simulator/` 配下）に公開します。ベースパスは `VITE_BASE_PATH` 環境変数(`vite.config.ts`)で切り替えており、深いパス(`/calculator` など)への直接アクセスは `404.html`（`index.html` の複製）でSPAにフォールバックします。初回のみ、リポジトリの Settings → Pages → Build and deployment → Source を「GitHub Actions」に設定してください。
+`main` ブランチへの push で `.github/workflows/deploy.yml` が自動的に `pnpm build` を実行し、GitHub Pagesに公開します。カスタムドメイン `simulator.logicalfp.pro` のルート配下で配信するため、ベースパスは `VITE_BASE_PATH=/`(`vite.config.ts`)に固定しています。深いパス(`/calculator` など)への直接アクセスは `404.html`(`index.html` の複製)でSPAにフォールバックします。`client/public/CNAME` にドメイン名を記載しており、ビルド成果物に含まれてデプロイされます。
+
+初回のみ、以下の設定が必要です:
+
+1. リポジトリの Settings → Pages → Build and deployment → Source を「GitHub Actions」に設定
+2. DNSプロバイダ側で `simulator` サブドメインのCNAMEレコードを `akihidesorimachi-tech.github.io` に向ける
+3. Settings → Pages → Custom domain に `simulator.logicalfp.pro` を入力して保存(DNS反映後、GitHubがドメイン所有を検証すると「Enforce HTTPS」が選択可能になります)
 
 ## ファイル構成
 
