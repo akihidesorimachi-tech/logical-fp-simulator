@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { 
+import { sanitizeNumericString } from "@/lib/utils";
+import {
   Card, 
   CardContent, 
   CardDescription, 
@@ -109,6 +110,11 @@ export default function Home() {
 
   const [showEstimator, setShowEstimator] = useState(false);
 
+  // 想定インフレ率(小数)の入力中テキスト。数値stateだけをvalueに使うと
+  // 末尾の"."が確定するたびに消えてしまい「1.」の後に「5」を打っても
+  // 「1.5」にならないため、入力中は生の文字列を表示し、blur時に数値表示へ戻す。
+  const [inflationRateDraft, setInflationRateDraft] = useState<string | null>(null);
+
   // 数値のフォーマット用
   const formatManen = (value: number) => {
     if (value >= 10000) {
@@ -121,8 +127,8 @@ export default function Home() {
 
   // 完全に独立したシンプルな入力ハンドラ
   const handleInputChange = (field: keyof CalculationInputs, rawValue: string | number) => {
-    let value = typeof rawValue === "string" ? parseFloat(rawValue) : rawValue;
-    
+    let value = typeof rawValue === "string" ? parseFloat(sanitizeNumericString(rawValue, true)) : rawValue;
+
     // 空文字やNaNの場合は0とする
     if (isNaN(value)) {
       value = 0;
@@ -165,6 +171,7 @@ export default function Home() {
 
   // プリセット設定
   const applyPreset = (type: 'standard' | 'frugal' | 'luxurious') => {
+    setInflationRateDraft(null);
     switch (type) {
       case 'standard':
         setInputs({
@@ -439,7 +446,7 @@ export default function Home() {
                     />
                     <Input
                       id="livingCost"
-                      type="number"
+                      type="text"
                       inputMode="numeric"
                       value={inputs.livingCost === 0 ? "" : inputs.livingCost}
                       placeholder="0"
@@ -470,7 +477,7 @@ export default function Home() {
                     />
                     <Input
                       id="housingCost"
-                      type="number"
+                      type="text"
                       inputMode="numeric"
                       value={inputs.housingCost === 0 ? "" : inputs.housingCost}
                       placeholder="0"
@@ -504,7 +511,7 @@ export default function Home() {
                     />
                     <Input
                       id="leisureCost"
-                      type="number"
+                      type="text"
                       inputMode="numeric"
                       value={inputs.leisureCost === 0 ? "" : inputs.leisureCost}
                       placeholder="0"
@@ -533,17 +540,24 @@ export default function Home() {
                       max={5}
                       step={0.1}
                       value={[inputs.inflationRate]}
-                      onValueChange={([val]) => handleInputChange('inflationRate', val)}
+                      onValueChange={([val]) => {
+                        setInflationRateDraft(null);
+                        handleInputChange('inflationRate', val);
+                      }}
                       className="flex-1"
                     />
                     <Input
                       id="inflationRate"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.1"
-                      value={inputs.inflationRate === 0 ? "" : inputs.inflationRate}
+                      value={inflationRateDraft ?? (inputs.inflationRate === 0 ? "" : inputs.inflationRate)}
                       placeholder="0"
-                      onChange={(e) => handleInputChange('inflationRate', e.target.value)}
+                      onChange={(e) => {
+                        const cleaned = sanitizeNumericString(e.target.value, true);
+                        setInflationRateDraft(cleaned);
+                        handleInputChange('inflationRate', cleaned);
+                      }}
+                      onBlur={() => setInflationRateDraft(null)}
                       className="w-16 h-8 text-xs text-right font-semibold"
                     />
                   </div>
@@ -557,7 +571,7 @@ export default function Home() {
                       <Label htmlFor="currentAge" className="text-[10px] text-muted-foreground">E. 現在年齢</Label>
                       <Input
                         id="currentAge"
-                        type="number"
+                        type="text"
                         inputMode="numeric"
                         value={inputs.currentAge === 0 ? "" : inputs.currentAge}
                         placeholder="0"
@@ -569,7 +583,7 @@ export default function Home() {
                       <Label htmlFor="retirementAge" className="text-[10px] text-muted-foreground">F. 退職年齢</Label>
                       <Input
                         id="retirementAge"
-                        type="number"
+                        type="text"
                         inputMode="numeric"
                         value={inputs.retirementAge === 0 ? "" : inputs.retirementAge}
                         placeholder="0"
@@ -581,7 +595,7 @@ export default function Home() {
                       <Label htmlFor="deathAge" className="text-[10px] text-muted-foreground">G. 逝去年齢</Label>
                       <Input
                         id="deathAge"
-                        type="number"
+                        type="text"
                         inputMode="numeric"
                         value={inputs.deathAge === 0 ? "" : inputs.deathAge}
                         placeholder="0"
@@ -619,7 +633,7 @@ export default function Home() {
                     />
                     <Input
                       id="pensionIncome"
-                      type="number"
+                      type="text"
                       inputMode="numeric"
                       value={inputs.pensionIncome === 0 ? "" : inputs.pensionIncome}
                       placeholder="0"
@@ -655,7 +669,7 @@ export default function Home() {
                           <div className="relative">
                             <Input
                               id="initialSalary"
-                              type="number"
+                              type="text"
                               inputMode="numeric"
                               value={inputs.initialSalary === 0 ? "" : inputs.initialSalary}
                               placeholder="0"
@@ -670,7 +684,7 @@ export default function Home() {
                           <div className="relative">
                             <Input
                               id="peakSalary"
-                              type="number"
+                              type="text"
                               inputMode="numeric"
                               value={inputs.peakSalary === 0 ? "" : inputs.peakSalary}
                               placeholder="0"

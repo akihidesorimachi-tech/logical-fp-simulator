@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "wouter";
+import { sanitizeNumericString } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,6 +81,12 @@ export default function AssetManagement() {
       yearsToContribute: 30,
     }
   ]);
+
+  // 想定利回り(小数)の入力中テキストを資産IDごとに保持する。
+  // 数値stateだけを value に使うと、末尾の"."が確定するたびに消えてしまい
+  // 「6.」の後に「5」を打っても「6.5」にならない問題が起きるため、
+  // 入力中は生の文字列をそのまま表示し、blur時に数値表示へ戻す。
+  const [expectedReturnDrafts, setExpectedReturnDrafts] = useState<Record<string, string>>({});
 
   // 共通設定が変更されたとき、各資産の積立年数がX年後を超えないように調整
   const handleYearsToRetireChange = (val: number) => {
@@ -164,12 +171,32 @@ export default function AssetManagement() {
     }
   };
 
-  const handleAssetNumberInput = (id: string, field: keyof Asset, maxVal?: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/^0+/, "");
-    let num = val === "" ? 0 : parseFloat(val);
+  const handleAssetNumberInput = (id: string, field: keyof Asset, maxVal?: number, allowDecimal = false) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = sanitizeNumericString(e.target.value, allowDecimal).replace(/^0+(?=\d)/, "");
+    let num = val === "" || val === "." ? 0 : parseFloat(val);
     if (isNaN(num)) num = 0;
     if (maxVal !== undefined && num > maxVal) num = maxVal;
     updateAsset(id, { [field]: num });
+  };
+
+  // 想定利回り用：入力中は生の文字列(末尾の"."を含む)をそのまま保持し、
+  // blur時にクリアして数値ベースの表示に戻す
+  const handleExpectedReturnChange = (id: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = sanitizeNumericString(e.target.value, true);
+    setExpectedReturnDrafts(prev => ({ ...prev, [id]: cleaned }));
+    const val = cleaned.replace(/^0+(?=\d)/, "");
+    let num = val === "" || val === "." ? 0 : parseFloat(val);
+    if (isNaN(num)) num = 0;
+    updateAsset(id, { expectedReturn: num });
+  };
+
+  const handleExpectedReturnBlur = (id: string) => () => {
+    setExpectedReturnDrafts(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   // 0年目からX年目までの推移シミュレーション計算
@@ -358,11 +385,11 @@ export default function AssetManagement() {
                 />
                 <div className="relative w-32 flex-shrink-0">
                   <Input
-                    type="number"
+                    type="text"
                     inputMode="numeric"
                     value={yearsToRetire === 0 ? "" : yearsToRetire}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value.replace(/^0+/, "")) || 0;
+                      const val = parseInt(sanitizeNumericString(e.target.value)) || 0;
                       handleYearsToRetireChange(Math.min(50, val));
                     }}
                     placeholder="0"
@@ -432,7 +459,15 @@ export default function AssetManagement() {
                       <Label className="text-xs font-semibold text-[oklch(0.4_0.01_45)] w-28 flex-shrink-0">資産クラス</Label>
                       <Select
                         value={asset.assetClass}
-                        onValueChange={(val: "risk" | "safe" | "commodity") => updateAsset(asset.id, { assetClass: val })}
+                        onValueChange={(val: "risk" | "safe" | "commodity") => {
+                          updateAsset(asset.id, { assetClass: val });
+                          setExpectedReturnDrafts(prev => {
+                            if (!(asset.id in prev)) return prev;
+                            const next = { ...prev };
+                            delete next[asset.id];
+                            return next;
+                          });
+                        }}
                       >
                         <SelectTrigger className="h-9 text-xs bg-white border-[oklch(0.9_0.01_45)] flex-1">
                           <SelectValue placeholder="選択してください" />
@@ -450,7 +485,7 @@ export default function AssetManagement() {
                       <Label className="text-xs font-semibold text-[oklch(0.4_0.01_45)] w-28 flex-shrink-0">現在保有価額</Label>
                       <div className="relative flex-1">
                         <Input
-                          type="number"
+                          type="text"
                           inputMode="numeric"
                           value={asset.currentValue === 0 ? "" : asset.currentValue}
                           onChange={handleAssetNumberInput(asset.id, "currentValue")}
@@ -479,7 +514,7 @@ export default function AssetManagement() {
                         </Select>
                         <div className="relative flex-1">
                           <Input
-                            type="number"
+                            type="text"
                             inputMode="numeric"
                             value={asset.contributionValue === 0 ? "" : asset.contributionValue}
                             onChange={handleAssetNumberInput(asset.id, "contributionValue")}
@@ -496,12 +531,12 @@ export default function AssetManagement() {
                       <Label className="text-xs font-semibold text-[oklch(0.4_0.01_45)] w-28 flex-shrink-0">想定利回り (年率)</Label>
                       <div className="relative flex-1">
                         <Input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          value={asset.expectedReturn === 0 ? "" : asset.expectedReturn}
-                          onChange={handleAssetNumberInput(asset.id, "expectedReturn")}
+                          value={expectedReturnDrafts[asset.id] ?? (asset.expectedReturn === 0 ? "" : asset.expectedReturn)}
+                          onChange={handleExpectedReturnChange(asset.id)}
+                          onBlur={handleExpectedReturnBlur(asset.id)}
                           placeholder="0.0"
-                          step="0.1"
                           className="h-9 pr-12 text-right font-medium bg-white border-[oklch(0.9_0.01_45)] w-full"
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[oklch(0.5_0.01_50)] font-medium">%</span>
@@ -514,7 +549,7 @@ export default function AssetManagement() {
                         <Label className="text-xs font-semibold text-[oklch(0.4_0.01_45)] w-28 flex-shrink-0">積立年数</Label>
                         <div className="relative flex-1">
                           <Input
-                            type="number"
+                            type="text"
                             inputMode="numeric"
                             value={asset.yearsToContribute === 0 ? "" : asset.yearsToContribute}
                             onChange={handleAssetNumberInput(asset.id, "yearsToContribute", yearsToRetire)}
