@@ -359,6 +359,7 @@ export default function AssetManagement() {
                 <div className="relative w-32 flex-shrink-0">
                   <Input
                     type="number"
+                    inputMode="numeric"
                     value={yearsToRetire === 0 ? "" : yearsToRetire}
                     onChange={(e) => {
                       const val = parseInt(e.target.value.replace(/^0+/, "")) || 0;
@@ -450,6 +451,7 @@ export default function AssetManagement() {
                       <div className="relative flex-1">
                         <Input
                           type="number"
+                          inputMode="numeric"
                           value={asset.currentValue === 0 ? "" : asset.currentValue}
                           onChange={handleAssetNumberInput(asset.id, "currentValue")}
                           placeholder="0"
@@ -478,6 +480,7 @@ export default function AssetManagement() {
                         <div className="relative flex-1">
                           <Input
                             type="number"
+                            inputMode="numeric"
                             value={asset.contributionValue === 0 ? "" : asset.contributionValue}
                             onChange={handleAssetNumberInput(asset.id, "contributionValue")}
                             placeholder="0"
@@ -494,6 +497,7 @@ export default function AssetManagement() {
                       <div className="relative flex-1">
                         <Input
                           type="number"
+                          inputMode="decimal"
                           value={asset.expectedReturn === 0 ? "" : asset.expectedReturn}
                           onChange={handleAssetNumberInput(asset.id, "expectedReturn")}
                           placeholder="0.0"
@@ -511,6 +515,7 @@ export default function AssetManagement() {
                         <div className="relative flex-1">
                           <Input
                             type="number"
+                            inputMode="numeric"
                             value={asset.yearsToContribute === 0 ? "" : asset.yearsToContribute}
                             onChange={handleAssetNumberInput(asset.id, "yearsToContribute", yearsToRetire)}
                             placeholder="0"

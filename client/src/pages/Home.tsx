@@ -440,6 +440,7 @@ export default function Home() {
                     <Input
                       id="livingCost"
                       type="number"
+                      inputMode="numeric"
                       value={inputs.livingCost === 0 ? "" : inputs.livingCost}
                       placeholder="0"
                       onChange={(e) => handleInputChange('livingCost', e.target.value)}
@@ -470,6 +471,7 @@ export default function Home() {
                     <Input
                       id="housingCost"
                       type="number"
+                      inputMode="numeric"
                       value={inputs.housingCost === 0 ? "" : inputs.housingCost}
                       placeholder="0"
                       onChange={(e) => handleInputChange('housingCost', e.target.value)}
@@ -503,6 +505,7 @@ export default function Home() {
                     <Input
                       id="leisureCost"
                       type="number"
+                      inputMode="numeric"
                       value={inputs.leisureCost === 0 ? "" : inputs.leisureCost}
                       placeholder="0"
                       onChange={(e) => handleInputChange('leisureCost', e.target.value)}
@@ -536,6 +539,7 @@ export default function Home() {
                     <Input
                       id="inflationRate"
                       type="number"
+                      inputMode="decimal"
                       step="0.1"
                       value={inputs.inflationRate === 0 ? "" : inputs.inflationRate}
                       placeholder="0"
@@ -554,6 +558,7 @@ export default function Home() {
                       <Input
                         id="currentAge"
                         type="number"
+                        inputMode="numeric"
                         value={inputs.currentAge === 0 ? "" : inputs.currentAge}
                         placeholder="0"
                         onChange={(e) => handleInputChange('currentAge', e.target.value)}
@@ -565,6 +570,7 @@ export default function Home() {
                       <Input
                         id="retirementAge"
                         type="number"
+                        inputMode="numeric"
                         value={inputs.retirementAge === 0 ? "" : inputs.retirementAge}
                         placeholder="0"
                         onChange={(e) => handleInputChange('retirementAge', e.target.value)}
@@ -576,6 +582,7 @@ export default function Home() {
                       <Input
                         id="deathAge"
                         type="number"
+                        inputMode="numeric"
                         value={inputs.deathAge === 0 ? "" : inputs.deathAge}
                         placeholder="0"
                         onChange={(e) => handleInputChange('deathAge', e.target.value)}
@@ -613,6 +620,7 @@ export default function Home() {
                     <Input
                       id="pensionIncome"
                       type="number"
+                      inputMode="numeric"
                       value={inputs.pensionIncome === 0 ? "" : inputs.pensionIncome}
                       placeholder="0"
                       onChange={(e) => handleInputChange('pensionIncome', e.target.value)}
@@ -648,6 +656,7 @@ export default function Home() {
                             <Input
                               id="initialSalary"
                               type="number"
+                              inputMode="numeric"
                               value={inputs.initialSalary === 0 ? "" : inputs.initialSalary}
                               placeholder="0"
                               onChange={(e) => handleInputChange('initialSalary', e.target.value)}
@@ -662,6 +671,7 @@ export default function Home() {
                             <Input
                               id="peakSalary"
                               type="number"
+                              inputMode="numeric"
                               value={inputs.peakSalary === 0 ? "" : inputs.peakSalary}
                               placeholder="0"
                               onChange={(e) => handleInputChange('peakSalary', e.target.value)}
