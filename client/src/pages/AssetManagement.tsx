@@ -512,16 +512,16 @@ export default function AssetManagement() {
                             <SelectItem value="yearly" className="text-xs">年額</SelectItem>
                           </SelectContent>
                         </Select>
-                        <div className="relative flex-1">
+                        <div className="flex items-center gap-1 flex-1 min-w-0">
                           <Input
                             type="text"
                             inputMode="numeric"
                             value={asset.contributionValue === 0 ? "" : asset.contributionValue}
                             onChange={handleAssetNumberInput(asset.id, "contributionValue")}
                             placeholder="0"
-                            className="h-9 pr-16 text-right font-medium bg-white border-[oklch(0.9_0.01_45)] w-full"
+                            className="h-9 text-right font-medium bg-white border-[oklch(0.9_0.01_45)] w-full min-w-0"
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[oklch(0.5_0.01_50)] font-medium">万円</span>
+                          <span className="text-xs text-[oklch(0.5_0.01_50)] font-medium flex-shrink-0">万円</span>
                         </div>
                       </div>
                     </div>
