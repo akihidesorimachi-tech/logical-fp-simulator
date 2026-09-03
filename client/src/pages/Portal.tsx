@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calculator, TrendingUp, Landmark, Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
+import Disclaimer from "@/components/Disclaimer";
 
 export default function Portal() {
   return (
@@ -123,8 +124,9 @@ export default function Portal() {
       </main>
 
       {/* フッター */}
-      <footer className="border-t border-border bg-white/50 py-6 text-center text-xs text-muted-foreground relative z-10 mt-auto">
+      <footer className="border-t border-border bg-white/50 py-6 text-center text-xs text-muted-foreground relative z-10 mt-auto space-y-2">
         <p>© 2026 LOGICAL FP — 1級ファイナンシャルプランナー監修ライフプランシステム</p>
+        <Disclaimer />
       </footer>
 
     </div>

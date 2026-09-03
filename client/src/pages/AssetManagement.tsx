@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { sanitizeNumericString } from "@/lib/utils";
+import Disclaimer from "@/components/Disclaimer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -827,9 +828,15 @@ export default function AssetManagement() {
             </Card>
 
           </div>
-          
+
         </div>
       </main>
+
+      {/* フッター */}
+      <footer className="border-t border-border bg-white/50 py-6 text-center text-xs text-muted-foreground space-y-2">
+        <p>© 2026 LOGICAL FP — 1級ファイナンシャルプランナー監修ライフプランシステム</p>
+        <Disclaimer />
+      </footer>
     </div>
   );
 }

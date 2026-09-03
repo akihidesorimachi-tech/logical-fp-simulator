@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import Disclaimer from "@/components/Disclaimer";
 import { 
   TrendingUp, 
   HelpCircle, 
@@ -1073,9 +1074,7 @@ export default function Home() {
           <p className="text-xs text-muted-foreground">
             © 2026 LOGICAL FP - 1級ファイナンシャルプランナー監修ライフプランシステム. All rights reserved.
           </p>
-          <p className="text-[10px] text-muted-foreground/60 max-w-xl mx-auto leading-relaxed">
-            ※本ツールは、入力されたインフレ率および簡易的な年金制度に基づいて算出されたシミュレーションであり、将来の実際の資金需要や年金受給額を保証するものではありません。資産運用のご判断はご自身の責任において行っていただきますようお願いいたします。
-          </p>
+          <Disclaimer />
         </div>
       </footer>
     </div>
