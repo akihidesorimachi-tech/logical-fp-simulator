@@ -162,7 +162,9 @@ export default function Home() {
     const avgSalary = cappedSalarySum / years;
     const avgSalaryRaw = rawSalarySum / years;
 
-    const basicPensionYearly = 80 * (inputs.workingYears / 40);
+    // 基礎年金（国民年金）は、40年間の保険料を全て納付したものとして満額（年額80万円）で計算する。
+    const BASIC_PENSION_FULL_YEARLY = 80;
+    const basicPensionYearly = BASIC_PENSION_FULL_YEARLY;
     const welfarePensionYearly = avgSalary * 0.005481 * inputs.workingYears;
 
     const totalPensionYearly = basicPensionYearly + welfarePensionYearly;
@@ -769,7 +771,7 @@ export default function Home() {
                         </Button>
                       </div>
                       <p className="text-[8px] text-muted-foreground leading-tight">
-                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（一律）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合、配偶者の年金額（専業主婦等の期間があれば基礎年金のみのケースが多い）はこの概算に含まれていないため、世帯の年金合計として使う場合は別途加算してください。
+                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（40年間満額納付を前提に年額80万円の満額で一律計算）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合、配偶者の年金額（専業主婦等の期間があれば基礎年金のみのケースが多い）はこの概算に含まれていないため、世帯の年金合計として使う場合は別途加算してください。
                       </p>
                     </div>
                   )}
@@ -854,6 +856,9 @@ export default function Home() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
+                  <p className="text-[9px] text-primary/70 font-medium mt-1">
+                    ※老後の運用利回り＝想定インフレ率（年率 {inputs.inflationRate}%）と仮定した場合の金額です。
+                  </p>
                 </CardHeader>
                 <CardContent className="px-4 pb-4">
                   <div className="space-y-1">
