@@ -294,10 +294,24 @@ export default function Home() {
     // 別スレッドのFPドクターと一致させるため、老後期間は「逝去年齢 - 退職年齢」とする（逝去年齢に達した年に逝去するため、その年の生活費は含めない＝30年間）
     const retirementDuration = safeDeathAge - safeRetirementAge;
 
-    // 公的年金は原則65歳から受給開始（繰上げ・繰下げは考慮しない簡易モデル）。
-    // 退職年齢が65歳より早い場合、65歳になるまでは年金収入がないものとして扱う。
-    const PENSION_START_AGE = 65;
-    const pensionStartAge = Math.max(safeRetirementAge, PENSION_START_AGE);
+    // H欄は「65歳受給の場合」の金額として入力してもらい、退職年齢(F)に合わせて
+    // 繰上げ受給（早く受け取る分、減額）・繰下げ受給（遅く受け取る分、増額）を補正する。
+    // 実際の年金請求は退職と同時に行うものとして計算する（65歳より前でも待たずに請求）。
+    // 率は現行の国民年金・厚生年金の繰上げ／繰下げ制度の標準率。
+    const PENSION_BASE_CLAIM_AGE = 65;
+    const PENSION_MIN_CLAIM_AGE = 60;   // 繰上げ受給できる最も早い年齢
+    const PENSION_MAX_CLAIM_AGE = 75;   // 繰下げ受給できる最も遅い年齢
+    const EARLY_REDUCTION_RATE_PER_MONTH = 0.004;   // 繰上げ: 1ヶ月あたり0.4%減額
+    const DEFERRED_INCREASE_RATE_PER_MONTH = 0.007; // 繰下げ: 1ヶ月あたり0.7%増額
+
+    const pensionClaimAge = Math.min(PENSION_MAX_CLAIM_AGE, Math.max(PENSION_MIN_CLAIM_AGE, safeRetirementAge));
+    const pensionClaimMonthsFromBase = (pensionClaimAge - PENSION_BASE_CLAIM_AGE) * 12;
+    const pensionAdjustmentFactor = pensionClaimMonthsFromBase < 0
+      ? 1 + pensionClaimMonthsFromBase * EARLY_REDUCTION_RATE_PER_MONTH
+      : 1 + pensionClaimMonthsFromBase * DEFERRED_INCREASE_RATE_PER_MONTH;
+
+    // 退職年齢が60歳未満の場合のみ、60歳になるまで年金なしの空白期間が発生する
+    const pensionStartAge = Math.max(safeRetirementAge, pensionClaimAge);
 
     const inflationFactorAtRetirement = Math.pow(1 + r, yearsToRetire);
 
@@ -306,7 +320,9 @@ export default function Home() {
     const startLeisureCostYearly = leisureCost * inflationFactorAtRetirement;
     const startYearlyTotal = startLivingCostYearly + startHousingCostYearly + startLeisureCostYearly;
 
-    const totalMonthlyPension = pensionIncome + (hasSpouse ? spousePensionIncome : 0);
+    // 補正はご本人分（H）のみに適用し、配偶者分は入力値をそのまま使う
+    const adjustedSelfPensionMonthly = pensionIncome * pensionAdjustmentFactor;
+    const totalMonthlyPension = adjustedSelfPensionMonthly + (hasSpouse ? spousePensionIncome : 0);
     const pensionYearlyNominal = totalMonthlyPension * 12;
 
     const chartData: ChartDataPoint[] = [];
@@ -371,7 +387,11 @@ export default function Home() {
       safeRetirementAge,
       safeDeathAge,
       pensionStartAge,
-      totalMonthlyPension
+      totalMonthlyPension,
+      pensionClaimAge,
+      pensionAdjustmentFactor,
+      pensionClaimMonthsFromBase,
+      adjustedSelfPensionMonthly: Math.round(adjustedSelfPensionMonthly * 10) / 10
     };
   }, [inputs]);
 
@@ -661,7 +681,7 @@ export default function Home() {
                       現在 <strong className="text-foreground">{inputs.currentAge}歳</strong>。老後生活は <strong className="text-foreground">{results.retirementDuration}年間</strong>（{results.safeRetirementAge}歳〜{results.safeDeathAge}歳）続く想定です。
                       {results.pensionStartAge > results.safeRetirementAge && (
                         <>
-                          {" "}公的年金は原則65歳からの受給のため、<strong className="text-foreground">{results.safeRetirementAge}〜{results.pensionStartAge - 1}歳の{results.pensionStartAge - results.safeRetirementAge}年間は年金なし</strong>として計算しています。
+                          {" "}公的年金は60歳より前には受給開始できないため、<strong className="text-foreground">{results.safeRetirementAge}〜{results.pensionStartAge - 1}歳の{results.pensionStartAge - results.safeRetirementAge}年間は年金なし</strong>として計算しています。
                         </>
                       )}
                     </span>
@@ -673,7 +693,7 @@ export default function Home() {
                   <div className="flex justify-between items-center">
                     <Label htmlFor="pensionIncome" className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                       <Wallet className="w-3.5 h-3.5" />
-                      H. 想定年金受給額 (月額)
+                      H. 65歳受給の場合の想定年金受給額 (月額)
                     </Label>
                     <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{inputs.pensionIncome} 万円/月</span>
                   </div>
@@ -696,6 +716,30 @@ export default function Home() {
                       onChange={(e) => handleInputChange('pensionIncome', e.target.value)}
                       className="w-16 h-8 text-xs text-right font-semibold border-emerald-200 focus-visible:ring-emerald-500"
                     />
+                  </div>
+
+                  {/* F. 退職年齢に合わせた繰上げ・繰下げ補正 */}
+                  <div className="p-2 bg-amber-500/5 border border-amber-500/10 rounded text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                    {results.pensionAdjustmentFactor === 1 ? (
+                      <span>F. 退職年齢は65歳のため、補正なしでそのまま月額 <strong>{inputs.pensionIncome}万円</strong> を適用します。</span>
+                    ) : (
+                      <span>
+                        → F. 退職年齢（{results.safeRetirementAge}歳）で受給を開始すると、65歳基準から
+                        <strong>{Math.abs(results.pensionClaimMonthsFromBase)}ヶ月{results.pensionClaimMonthsFromBase < 0 ? "早い繰上げ受給" : "遅い繰下げ受給"}</strong>
+                        となり、{results.pensionClaimMonthsFromBase < 0 ? "0.4" : "0.7"}%×{Math.abs(results.pensionClaimMonthsFromBase)}ヶ月＝
+                        <strong>{(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%{results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}</strong>
+                        されます。補正後のご本人受給額：<strong className="text-xs">{results.adjustedSelfPensionMonthly}万円/月</strong>
+                        {results.pensionClaimAge !== results.safeRetirementAge && (
+                          <>
+                            （{results.pensionClaimAge}歳で請求したものとして計算。
+                            {results.safeRetirementAge < 60
+                              ? "年金は60歳より前に請求できないため"
+                              : "年金は75歳より後に繰り下げられないため"}
+                            ）
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
 
                   {/* 配偶者の年金 */}
@@ -1017,7 +1061,7 @@ export default function Home() {
 
                 <div className="text-[10px] text-muted-foreground leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/30">
                   <Info className="w-3.5 h-3.5 text-primary inline-block mr-1 -mt-0.5 shrink-0" />
-                  年金（月額 {results.totalMonthlyPension}万円{inputs.hasSpouse ? "、ご本人+配偶者" : ""}）はインフレで増えない（名目額固定）ため、実質価値が目減りします。手元資金をインフレ相当（年率 {inputs.inflationRate}%）で運用しながら取り崩すことで、物価上昇分をカバーし、自己準備額を<strong className="text-foreground"> {formatManen(results.netInvestmentBenefit)} </strong>削減できます。
+                  年金（月額 {Math.round(results.totalMonthlyPension * 10) / 10}万円{inputs.hasSpouse ? "、ご本人+配偶者" : ""}）はインフレで増えない（名目額固定）ため、実質価値が目減りします。手元資金をインフレ相当（年率 {inputs.inflationRate}%）で運用しながら取り崩すことで、物価上昇分をカバーし、自己準備額を<strong className="text-foreground"> {formatManen(results.netInvestmentBenefit)} </strong>削減できます。
                 </div>
               </CardContent>
             </Card>
