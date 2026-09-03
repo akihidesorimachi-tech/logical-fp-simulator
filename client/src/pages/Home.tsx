@@ -11,13 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import Disclaimer from "@/components/Disclaimer";
-import { 
-  TrendingUp, 
-  HelpCircle, 
-  Coins, 
-  Home as HomeIcon, 
-  Sparkles, 
+import {
+  TrendingUp,
+  HelpCircle,
+  Coins,
+  Home as HomeIcon,
+  Sparkles,
   Info,
   LineChart,
   Percent,
@@ -25,6 +26,7 @@ import {
   Wallet,
   Calculator,
   UserCheck,
+  Users,
   ArrowLeft
 } from "lucide-react";
 import { Link } from "wouter";
@@ -54,13 +56,19 @@ interface CalculationInputs {
   currentAge: number;     // E. 現在の年齢
   retirementAge: number;  // F. セカンドライフスタート年齢
   deathAge: number;       // G. 逝去年齢
-  pensionIncome: number;  // H. 年金受給額 (月額, 万)
-  
+  pensionIncome: number;  // H. 年金受給額 (月額, 万) ※ご本人分
+  hasSpouse: boolean;      // 配偶者の有無
+  spousePensionIncome: number; // 配偶者の年金受給額 (月額, 万)
+
   // 年金概算用の追加入力
   initialSalary: number;  // 社会人最初の年収 (万)
   peakSalary: number;     // ピーク時の年収 (万)
   workingYears: number;   // 厚生年金加入期間 (年, デフォルト40年)
 }
+
+// 配偶者が基礎年金（国民年金）のみを受給する場合の月額目安
+// （40年間満額納付した場合の満額年額80万円 ÷ 12ヶ月、四捨五入）
+const SPOUSE_BASIC_PENSION_ONLY_MONTHLY = Math.round(80 / 12);
 
 // グラフ用データの型定義
 interface ChartDataPoint {
@@ -104,6 +112,8 @@ export default function Home() {
     retirementAge: 65,   // 65歳
     deathAge: 95,        // 95歳
     pensionIncome: 16,   // 年金16万円/月（年収から概算する場合の初任給300万/ピーク700万/40年の概算値と一致）
+    hasSpouse: true,          // 「標準的な夫婦」なので配偶者ありを初期状態に
+    spousePensionIncome: SPOUSE_BASIC_PENSION_ONLY_MONTHLY,   // 配偶者は基礎年金のみ（専業主婦等）を想定した概算値
 
     // 年金概算用の初期値
     initialSalary: 300,  // 社会人最初の年収 300万
@@ -205,6 +215,8 @@ export default function Home() {
           retirementAge: 65,
           deathAge: 95,
           pensionIncome: 16,
+          hasSpouse: true,
+          spousePensionIncome: SPOUSE_BASIC_PENSION_ONLY_MONTHLY, // 配偶者は基礎年金のみ（専業主婦等）を想定
           initialSalary: 300,
           peakSalary: 700,
           workingYears: 40
@@ -220,6 +232,8 @@ export default function Home() {
           retirementAge: 60,
           deathAge: 90,
           pensionIncome: 13,
+          hasSpouse: false,
+          spousePensionIncome: 0,
           initialSalary: 250,
           peakSalary: 500,
           workingYears: 38
@@ -235,6 +249,8 @@ export default function Home() {
           retirementAge: 65,
           deathAge: 100,
           pensionIncome: 19,
+          hasSpouse: false,
+          spousePensionIncome: 0,
           initialSalary: 350,
           peakSalary: 1000,
           workingYears: 40
@@ -264,7 +280,9 @@ export default function Home() {
       currentAge,
       retirementAge,
       deathAge,
-      pensionIncome
+      pensionIncome,
+      hasSpouse,
+      spousePensionIncome
     } = inputs;
 
     const r = inflationRate / 100; // インフレ率(小数)
@@ -288,7 +306,8 @@ export default function Home() {
     const startLeisureCostYearly = leisureCost * inflationFactorAtRetirement;
     const startYearlyTotal = startLivingCostYearly + startHousingCostYearly + startLeisureCostYearly;
 
-    const pensionYearlyNominal = pensionIncome * 12;
+    const totalMonthlyPension = pensionIncome + (hasSpouse ? spousePensionIncome : 0);
+    const pensionYearlyNominal = totalMonthlyPension * 12;
 
     const chartData: ChartDataPoint[] = [];
     let cumulativeCost = 0;
@@ -351,7 +370,8 @@ export default function Home() {
       retirementDuration,
       safeRetirementAge,
       safeDeathAge,
-      pensionStartAge
+      pensionStartAge,
+      totalMonthlyPension
     };
   }, [inputs]);
 
@@ -678,6 +698,62 @@ export default function Home() {
                     />
                   </div>
 
+                  {/* 配偶者の年金 */}
+                  <div className="pt-2 flex items-center justify-between">
+                    <Label htmlFor="hasSpouse" className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5 cursor-pointer">
+                      <Users className="w-3.5 h-3.5 text-emerald-600" />
+                      配偶者の年金も合算する
+                    </Label>
+                    <Switch
+                      id="hasSpouse"
+                      checked={inputs.hasSpouse}
+                      onCheckedChange={(checked) => setInputs(prev => ({ ...prev, hasSpouse: checked }))}
+                    />
+                  </div>
+
+                  {inputs.hasSpouse && (
+                    <div className="p-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-lg space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label htmlFor="spousePensionIncome" className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          配偶者の想定年金受給額 (月額)
+                        </Label>
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{inputs.spousePensionIncome} 万円/月</span>
+                      </div>
+                      <Input
+                        id="spousePensionIncome"
+                        type="text"
+                        inputMode="numeric"
+                        value={inputs.spousePensionIncome === 0 ? "" : inputs.spousePensionIncome}
+                        placeholder="0"
+                        onChange={(e) => handleInputChange('spousePensionIncome', e.target.value)}
+                        className="h-8 text-xs text-right font-semibold border-emerald-200 focus-visible:ring-emerald-500"
+                      />
+                      <div className="flex gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInputs(prev => ({ ...prev, spousePensionIncome: prev.pensionIncome }))}
+                          className="text-[9px] h-6 px-2 flex-1 border-emerald-200 hover:bg-emerald-50/50 text-emerald-700"
+                        >
+                          本人と同額を入力
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInputs(prev => ({ ...prev, spousePensionIncome: SPOUSE_BASIC_PENSION_ONLY_MONTHLY }))}
+                          className="text-[9px] h-6 px-2 flex-1 border-emerald-200 hover:bg-emerald-50/50 text-emerald-700"
+                        >
+                          基礎年金のみ(専業主婦)を入力
+                        </Button>
+                      </div>
+                      <p className="text-[8px] text-muted-foreground leading-tight">
+                        ※「基礎年金のみ」は、40年間満額納付した場合の国民年金満額（年額80万円 ≒ 月額{SPOUSE_BASIC_PENSION_ONLY_MONTHLY}万円）です。ボタンは初期値の入力補助なので、金額はご自由に修正してください。
+                      </p>
+                    </div>
+                  )}
+
                   {/* 年金概算アコーディオントリガー */}
                   <div className="pt-1 flex justify-end">
                     <Button 
@@ -771,7 +847,7 @@ export default function Home() {
                         </Button>
                       </div>
                       <p className="text-[8px] text-muted-foreground leading-tight">
-                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（40年間満額納付を前提に年額80万円の満額で一律計算）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合、配偶者の年金額（専業主婦等の期間があれば基礎年金のみのケースが多い）はこの概算に含まれていないため、世帯の年金合計として使う場合は別途加算してください。
+                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（40年間満額納付を前提に年額80万円の満額で一律計算）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合は、上の「配偶者の年金も合算する」をオンにして、配偶者の年金額を別途入力してください。
                       </p>
                     </div>
                   )}
@@ -941,7 +1017,7 @@ export default function Home() {
 
                 <div className="text-[10px] text-muted-foreground leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/30">
                   <Info className="w-3.5 h-3.5 text-primary inline-block mr-1 -mt-0.5 shrink-0" />
-                  年金（月額 {inputs.pensionIncome}万円）はインフレで増えない（名目額固定）ため、実質価値が目減りします。手元資金をインフレ相当（年率 {inputs.inflationRate}%）で運用しながら取り崩すことで、物価上昇分をカバーし、自己準備額を<strong className="text-foreground"> {formatManen(results.netInvestmentBenefit)} </strong>削減できます。
+                  年金（月額 {results.totalMonthlyPension}万円{inputs.hasSpouse ? "、ご本人+配偶者" : ""}）はインフレで増えない（名目額固定）ため、実質価値が目減りします。手元資金をインフレ相当（年率 {inputs.inflationRate}%）で運用しながら取り崩すことで、物価上昇分をカバーし、自己準備額を<strong className="text-foreground"> {formatManen(results.netInvestmentBenefit)} </strong>削減できます。
                 </div>
               </CardContent>
             </Card>
