@@ -92,17 +92,19 @@ export default function Home() {
     window.scrollTo(0, 0);
   }, []);
 
-  // デフォルト入力値
+  // デフォルト入力値（「標準的な夫婦」プリセットと同じ値にしておく。
+  // ここがプリセットの値とズレていると、初期表示でプリセットボタンが
+  // 選択中に見えるのに実際の値が違う、という食い違いが起きるため）
   const [inputs, setInputs] = useState<CalculationInputs>({
     livingCost: 22,      // 22万円
-    housingCost: 8,      // 8万円
+    housingCost: 7,      // 7万円
     leisureCost: 50,     // 50万円
     inflationRate: 1.5,  // 1.5%
     currentAge: 35,      // 35歳
     retirementAge: 65,   // 65歳
     deathAge: 95,        // 95歳
-    pensionIncome: 15,   // 年金15万円/月
-    
+    pensionIncome: 16,   // 年金16万円/月（年収から概算する場合の初任給300万/ピーク700万/40年の概算値と一致）
+
     // 年金概算用の初期値
     initialSalary: 300,  // 社会人最初の年収 300万
     peakSalary: 700,     // ピーク時の年収 700万
@@ -143,21 +145,34 @@ export default function Home() {
 
   // 年金概算ロジック
   const estimatedPension = useMemo(() => {
-    const avgSalaryRaw = (inputs.initialSalary + inputs.peakSalary) / 2;
-    const MAX_PENSIONABLE_SALARY = 1230;
-    const avgSalary = Math.min(avgSalaryRaw, MAX_PENSIONABLE_SALARY);
-    
+    const MAX_PENSIONABLE_SALARY = 1230; // 標準報酬の年収換算上限（概算値）
+
+    // 標準報酬の上限は本来「年ごと」に適用されるものなので、初任給とピーク時年収の
+    // 単純平均にまとめて上限をかけるのではなく、直線的に上昇する各年の年収を
+    // 1年ずつ上限でカットしてから平均する（年収の伸びが急な設定でも過大評価しないため）。
+    const years = Math.max(1, Math.round(inputs.workingYears));
+    let cappedSalarySum = 0;
+    let rawSalarySum = 0;
+    for (let i = 0; i < years; i++) {
+      const t = years === 1 ? 1 : i / (years - 1);
+      const salaryThisYear = inputs.initialSalary + (inputs.peakSalary - inputs.initialSalary) * t;
+      rawSalarySum += salaryThisYear;
+      cappedSalarySum += Math.min(salaryThisYear, MAX_PENSIONABLE_SALARY);
+    }
+    const avgSalary = cappedSalarySum / years;
+    const avgSalaryRaw = rawSalarySum / years;
+
     const basicPensionYearly = 80 * (inputs.workingYears / 40);
     const welfarePensionYearly = avgSalary * 0.005481 * inputs.workingYears;
-    
+
     const totalPensionYearly = basicPensionYearly + welfarePensionYearly;
     const totalPensionMonthly = totalPensionYearly / 12;
-    
+
     return {
       monthly: Math.round(totalPensionMonthly),
       yearly: Math.round(totalPensionYearly),
-      avgSalary: Math.round(avgSalaryRaw),
-      isCapped: avgSalaryRaw > MAX_PENSIONABLE_SALARY
+      avgSalary: Math.round(avgSalary),
+      isCapped: avgSalary < avgSalaryRaw - 0.01
     };
   }, [inputs.initialSalary, inputs.peakSalary, inputs.workingYears]);
 
@@ -174,6 +189,10 @@ export default function Home() {
   const applyPreset = (type: 'standard' | 'frugal' | 'luxurious') => {
     setInflationRateDraft(null);
     switch (type) {
+      // 各プリセットの pensionIncome は、同じ initialSalary/peakSalary/workingYears を
+      // 「年収から概算する」機能に通したときの計算結果（Math.round後）と一致させている。
+      // ここがズレていると、プリセット適用直後の年金額と、概算ツールを開いたときに
+      // 表示される概算額が食い違って見えてしまうため。
       case 'standard':
         setInputs({
           livingCost: 22,
@@ -183,7 +202,7 @@ export default function Home() {
           currentAge: 35,
           retirementAge: 65,
           deathAge: 95,
-          pensionIncome: 15,
+          pensionIncome: 16,
           initialSalary: 300,
           peakSalary: 700,
           workingYears: 40
@@ -198,7 +217,7 @@ export default function Home() {
           currentAge: 35,
           retirementAge: 60,
           deathAge: 90,
-          pensionIncome: 11,
+          pensionIncome: 13,
           initialSalary: 250,
           peakSalary: 500,
           workingYears: 38
@@ -213,7 +232,7 @@ export default function Home() {
           currentAge: 40,
           retirementAge: 65,
           deathAge: 100,
-          pensionIncome: 22,
+          pensionIncome: 19,
           initialSalary: 350,
           peakSalary: 1000,
           workingYears: 40
@@ -247,7 +266,7 @@ export default function Home() {
     } = inputs;
 
     const r = inflationRate / 100; // インフレ率(小数)
-    
+
     const safeRetirementAge = Math.max(currentAge + 1, retirementAge);
     const safeDeathAge = Math.max(safeRetirementAge + 1, deathAge);
 
@@ -255,8 +274,13 @@ export default function Home() {
     // 別スレッドのFPドクターと一致させるため、老後期間は「逝去年齢 - 退職年齢」とする（逝去年齢に達した年に逝去するため、その年の生活費は含めない＝30年間）
     const retirementDuration = safeDeathAge - safeRetirementAge;
 
+    // 公的年金は原則65歳から受給開始（繰上げ・繰下げは考慮しない簡易モデル）。
+    // 退職年齢が65歳より早い場合、65歳になるまでは年金収入がないものとして扱う。
+    const PENSION_START_AGE = 65;
+    const pensionStartAge = Math.max(safeRetirementAge, PENSION_START_AGE);
+
     const inflationFactorAtRetirement = Math.pow(1 + r, yearsToRetire);
-    
+
     const startLivingCostYearly = (livingCost * 12) * inflationFactorAtRetirement;
     const startHousingCostYearly = (housingCost * 12) * inflationFactorAtRetirement;
     const startLeisureCostYearly = leisureCost * inflationFactorAtRetirement;
@@ -279,9 +303,11 @@ export default function Home() {
       const leisureCostYearly = startLeisureCostYearly * inflationFactorDuringRetirement;
       const totalCostYearly = livingCostYearly + housingCostYearly + leisureCostYearly;
 
+      const pensionYearlyThisYear = age >= pensionStartAge ? pensionYearlyNominal : 0;
+
       cumulativeCost += totalCostYearly;
       investedCumulativeCost += startYearlyTotal;
-      pensionCumulative += pensionYearlyNominal;
+      pensionCumulative += pensionYearlyThisYear;
 
       const netCashCumulative = Math.max(0, cumulativeCost - pensionCumulative);
       const netInvestedCumulative = Math.max(0, investedCumulativeCost - pensionCumulative);
@@ -295,7 +321,7 @@ export default function Home() {
         totalCostYearly: Math.round(totalCostYearly),
         cumulativeCost: Math.round(cumulativeCost),
         investedCumulativeCost: Math.round(investedCumulativeCost),
-        pensionYearly: Math.round(pensionYearlyNominal),
+        pensionYearly: Math.round(pensionYearlyThisYear),
         pensionCumulative: Math.round(pensionCumulative),
         netCashCumulative: Math.round(netCashCumulative),
         netInvestedCumulative: Math.round(netInvestedCumulative)
@@ -303,7 +329,8 @@ export default function Home() {
     }
 
     const totalCostNoInvestment = cumulativeCost;
-    const totalPensionNominal = pensionYearlyNominal * retirementDuration;
+    const pensionYears = Math.max(0, safeDeathAge - pensionStartAge);
+    const totalPensionNominal = pensionYearlyNominal * pensionYears;
     const netRequiredNoInvestment = Math.max(0, totalCostNoInvestment - totalPensionNominal);
 
     const totalCostWithInvestment = startYearlyTotal * retirementDuration;
@@ -321,7 +348,8 @@ export default function Home() {
       netInvestmentBenefit: Math.round(netInvestmentBenefit),
       retirementDuration,
       safeRetirementAge,
-      safeDeathAge
+      safeDeathAge,
+      pensionStartAge
     };
   }, [inputs]);
 
@@ -361,15 +389,15 @@ export default function Home() {
             老後必要資金シミュレーション
           </h2>
           <p className="text-muted-foreground text-xs md:text-sm max-w-2xl mx-auto leading-relaxed">
-            将来の期待インフレ（物価上昇）と、**インフレに連動しない公的年金（実質価値目減り）**の影響を厳密に考慮し、必要資金を算出します。
+            将来の期待インフレ（物価上昇）と、<strong className="text-foreground">インフレに連動しない公的年金（実質価値目減り）</strong>の影響を厳密に考慮し、必要資金を算出します。
           </p>
 
           {/* プリセット選択 */}
           <div className="flex flex-wrap justify-center gap-1.5 pt-1">
             <span className="text-[11px] text-muted-foreground flex items-center mr-1">モデルケース:</span>
-            <Button 
-              variant={inputs.livingCost === 22 && inputs.leisureCost === 50 ? "default" : "outline"} 
-              size="sm" 
+            <Button
+              variant={inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 ? "default" : "outline"}
+              size="sm"
               onClick={() => applyPreset('standard')}
               className="text-[10px] h-7 px-3 rounded-full transition-all"
             >
@@ -609,6 +637,11 @@ export default function Home() {
                     <Info className="w-3.5 h-3.5 text-primary shrink-0" />
                     <span>
                       現在 <strong className="text-foreground">{inputs.currentAge}歳</strong>。老後生活は <strong className="text-foreground">{results.retirementDuration}年間</strong>（{results.safeRetirementAge}歳〜{results.safeDeathAge}歳）続く想定です。
+                      {results.pensionStartAge > results.safeRetirementAge && (
+                        <>
+                          {" "}公的年金は原則65歳からの受給のため、<strong className="text-foreground">{results.safeRetirementAge}〜{results.pensionStartAge - 1}歳の{results.pensionStartAge - results.safeRetirementAge}年間は年金なし</strong>として計算しています。
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -736,7 +769,7 @@ export default function Home() {
                         </Button>
                       </div>
                       <p className="text-[8px] text-muted-foreground leading-tight">
-                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（一律）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。
+                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（一律）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合、配偶者の年金額（専業主婦等の期間があれば基礎年金のみのケースが多い）はこの概算に含まれていないため、世帯の年金合計として使う場合は別途加算してください。
                       </p>
                     </div>
                   )}
@@ -903,7 +936,7 @@ export default function Home() {
 
                 <div className="text-[10px] text-muted-foreground leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/30">
                   <Info className="w-3.5 h-3.5 text-primary inline-block mr-1 -mt-0.5 shrink-0" />
-                  年金（月額 {inputs.pensionIncome}万円）はインフレで増えない（名目額固定）ため、実質価値が目減りします。手元資金をインフレ相当（年率 {inputs.inflationRate}%）で運用しながら取り崩すことで、物価上昇分をカバーし、自己準備額を **{formatManen(results.netInvestmentBenefit)}** 削減できます。
+                  年金（月額 {inputs.pensionIncome}万円）はインフレで増えない（名目額固定）ため、実質価値が目減りします。手元資金をインフレ相当（年率 {inputs.inflationRate}%）で運用しながら取り崩すことで、物価上昇分をカバーし、自己準備額を<strong className="text-foreground"> {formatManen(results.netInvestmentBenefit)} </strong>削減できます。
                 </div>
               </CardContent>
             </Card>
@@ -1008,25 +1041,25 @@ export default function Home() {
                       <tr className="hover:bg-muted/10 transition-colors">
                         <td className="p-2.5 font-medium">{results.chartData[0].age}歳</td>
                         <td className="p-2.5 text-muted-foreground">引退初年度</td>
-                        <td className="p-2.5 text-right">{results.chartData[0].totalCostYearly} 万円</td>
-                        <td className="p-2.5 text-right font-semibold">{results.chartData[0].netCashCumulative} 万円</td>
-                        <td className="p-2.5 text-right font-semibold">{results.chartData[0].netInvestedCumulative} 万円</td>
+                        <td className="p-2.5 text-right">{results.chartData[0].totalCostYearly.toLocaleString()} 万円</td>
+                        <td className="p-2.5 text-right font-semibold">{results.chartData[0].netCashCumulative.toLocaleString()} 万円</td>
+                        <td className="p-2.5 text-right font-semibold">{results.chartData[0].netInvestedCumulative.toLocaleString()} 万円</td>
                         <td className="p-2.5 text-right font-bold text-primary">
-                          {results.chartData[0].netCashCumulative - results.chartData[0].netInvestedCumulative} 万円
+                          {(results.chartData[0].netCashCumulative - results.chartData[0].netInvestedCumulative).toLocaleString()} 万円
                         </td>
                       </tr>
                     )}
-                    
+
                     {/* 5年後 */}
                     {results.chartData.length > 5 && (
                       <tr className="hover:bg-muted/10 transition-colors">
                         <td className="p-2.5 font-medium">{results.chartData[4].age}歳</td>
                         <td className="p-2.5 text-muted-foreground">5年後</td>
-                        <td className="p-2.5 text-right">{results.chartData[4].totalCostYearly} 万円</td>
-                        <td className="p-2.5 text-right font-semibold">{results.chartData[4].netCashCumulative} 万円</td>
-                        <td className="p-2.5 text-right font-semibold">{results.chartData[4].netInvestedCumulative} 万円</td>
+                        <td className="p-2.5 text-right">{results.chartData[4].totalCostYearly.toLocaleString()} 万円</td>
+                        <td className="p-2.5 text-right font-semibold">{results.chartData[4].netCashCumulative.toLocaleString()} 万円</td>
+                        <td className="p-2.5 text-right font-semibold">{results.chartData[4].netInvestedCumulative.toLocaleString()} 万円</td>
                         <td className="p-2.5 text-right font-bold text-primary">
-                          {results.chartData[4].netCashCumulative - results.chartData[4].netInvestedCumulative} 万円
+                          {(results.chartData[4].netCashCumulative - results.chartData[4].netInvestedCumulative).toLocaleString()} 万円
                         </td>
                       </tr>
                     )}
@@ -1036,11 +1069,11 @@ export default function Home() {
                       <tr className="hover:bg-muted/10 transition-colors">
                         <td className="p-2.5 font-medium">{results.chartData[14].age}歳</td>
                         <td className="p-2.5 text-muted-foreground">15年後</td>
-                        <td className="p-2.5 text-right">{results.chartData[14].totalCostYearly} 万円</td>
-                        <td className="p-2.5 text-right font-semibold">{results.chartData[14].netCashCumulative} 万円</td>
-                        <td className="p-2.5 text-right font-semibold">{results.chartData[14].netInvestedCumulative} 万円</td>
+                        <td className="p-2.5 text-right">{results.chartData[14].totalCostYearly.toLocaleString()} 万円</td>
+                        <td className="p-2.5 text-right font-semibold">{results.chartData[14].netCashCumulative.toLocaleString()} 万円</td>
+                        <td className="p-2.5 text-right font-semibold">{results.chartData[14].netInvestedCumulative.toLocaleString()} 万円</td>
                         <td className="p-2.5 text-right font-bold text-primary">
-                          {results.chartData[14].netCashCumulative - results.chartData[14].netInvestedCumulative} 万円
+                          {(results.chartData[14].netCashCumulative - results.chartData[14].netInvestedCumulative).toLocaleString()} 万円
                         </td>
                       </tr>
                     )}
@@ -1050,7 +1083,7 @@ export default function Home() {
                       <tr className="bg-primary/[0.01] hover:bg-primary/[0.03] font-semibold border-t border-border/80">
                         <td className="p-2.5 text-primary">{results.chartData[results.chartData.length - 1].age}歳</td>
                         <td className="p-2.5 text-primary">最終年</td>
-                        <td className="p-2.5 text-right">{results.chartData[results.chartData.length - 1].totalCostYearly} 万円</td>
+                        <td className="p-2.5 text-right">{results.chartData[results.chartData.length - 1].totalCostYearly.toLocaleString()} 万円</td>
                         <td className="p-2.5 text-right text-foreground font-bold">{formatManen(results.netRequiredNoInvestment)}</td>
                         <td className="p-2.5 text-right text-primary font-bold">{formatManen(results.netRequiredWithInvestment)}</td>
                         <td className="p-2.5 text-right font-black text-primary text-xs">

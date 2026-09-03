@@ -400,6 +400,9 @@ export default function AssetManagement() {
                 </div>
               </div>
             </div>
+            <p className="text-[10px] text-[oklch(0.5_0.01_50)] leading-relaxed mt-4 pt-3 border-t border-[oklch(0.9_0.005_45)]">
+              ※各資産の積立は、月額なら毎月末、年額なら毎年末にまとめて積み立てるものとして複利計算しています（期首の一括投資分を除く）。また、想定利回りは税金を考慮しない税引前の数値としてご入力ください（NISA等の非課税口座か、課税口座（譲渡益に約20.315%課税）かで実際の手取りは異なります）。
+            </p>
           </CardContent>
         </Card>
 
@@ -476,7 +479,7 @@ export default function AssetManagement() {
                         <SelectContent>
                           <SelectItem value="risk" className="text-xs">リスク資産 (株式・投信・外貨等)</SelectItem>
                           <SelectItem value="safe" className="text-xs">安全資産 (日本国債・預金等)</SelectItem>
-                          <SelectItem value="commodity" className="text-xs">コモディティ (金・プラチナ・不動産等)</SelectItem>
+                          <SelectItem value="commodity" className="text-xs">コモディティ (金・プラチナ・原油等)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -709,7 +712,7 @@ export default function AssetManagement() {
                           <div className="w-3 h-3 rounded-full mt-1 flex-shrink-0" style={{ backgroundColor: "var(--chart-3)" }} />
                           <div>
                             <span className="font-bold text-xs text-foreground block">コモディティ</span>
-                            <span className="text-[10px] text-muted-foreground block">金・プラチナ・不動産・原油等</span>
+                            <span className="text-[10px] text-muted-foreground block">金・プラチナ・原油等</span>
                           </div>
                         </div>
                         <div className="text-right">
