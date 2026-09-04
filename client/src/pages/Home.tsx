@@ -249,8 +249,8 @@ export default function Home() {
           retirementAge: 65,
           deathAge: 100,
           pensionIncome: 19,
-          hasSpouse: false,
-          spousePensionIncome: 0,
+          hasSpouse: true,
+          spousePensionIncome: SPOUSE_BASIC_PENSION_ONLY_MONTHLY, // 配偶者は基礎年金のみ（専業主婦等）を想定
           initialSalary: 350,
           peakSalary: 1000,
           workingYears: 40
