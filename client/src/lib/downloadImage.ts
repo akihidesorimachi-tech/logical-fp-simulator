@@ -27,11 +27,18 @@ export async function downloadElementAsImage(
     restore();
   }
 
-  const dataUrl = canvas.toDataURL("image/png");
+  // toDataURL() + <a href="data:..."> は Safari (特に iOS) で大きな画像だと
+  // ダウンロードされず、表示すらされない不具合があるため、Blob + Object URL 方式を使う
+  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Canvas to Blob conversion failed");
+
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = dataUrl;
+  link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  // Safari 等でクリック直後に revoke すると中断されることがあるため少し待つ
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
