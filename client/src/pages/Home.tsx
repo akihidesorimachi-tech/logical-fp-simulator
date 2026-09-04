@@ -1376,7 +1376,10 @@ export default function Home() {
             key={variant}
             ref={isPc ? pcReportRef : mobileReportRef}
             className="fixed top-0 -left-[9999px] pointer-events-none"
-            style={{ width: `${isPc ? PC_CAPTURE_WIDTH : MOBILE_CAPTURE_WIDTH}px` }}
+            // font-feature-settings: "palt"（body由来のかな詰め）は html2canvas が
+            // 文字幅の計算に反映できず、実際の描画幅とズレて文字が重なって見えるため、
+            // レポート内だけ通常の文字送りに戻す
+            style={{ width: `${isPc ? PC_CAPTURE_WIDTH : MOBILE_CAPTURE_WIDTH}px`, fontFeatureSettings: "normal" }}
             aria-hidden="true"
           >
             <div className={`bg-background text-foreground font-sans-jp ${isPc ? "p-10" : "p-6"}`}>
