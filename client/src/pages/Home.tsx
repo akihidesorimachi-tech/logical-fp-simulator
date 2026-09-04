@@ -724,10 +724,7 @@ export default function Home() {
                   {/* F. 退職年齢に合わせた繰上げ・繰下げ補正 */}
                   <div className="p-2 bg-amber-500/5 border border-amber-500/10 rounded text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed">
                     {results.pensionAdjustmentFactor === 1 ? (
-                      <span>
-                        F. 退職年齢は65歳のため、補正なしでそのまま月額 <strong>{inputs.pensionIncome}万円</strong> を適用します。
-                        {inputs.hasSpouse && <>（配偶者も同様に月額 <strong>{inputs.spousePensionIncome}万円</strong>）</>}
-                      </span>
+                      <span>F. 退職年齢は65歳のため、補正なしでそのまま月額 <strong>{inputs.pensionIncome}万円</strong> を適用します。</span>
                     ) : (
                       <span>
                         → F. 退職年齢（{results.safeRetirementAge}歳）で受給を開始すると、65歳基準から
@@ -735,12 +732,6 @@ export default function Home() {
                         となり、{results.pensionClaimMonthsFromBase < 0 ? "0.4" : "0.7"}%×{Math.abs(results.pensionClaimMonthsFromBase)}ヶ月＝
                         <strong>{(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%{results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}</strong>
                         されます。補正後のご本人受給額：<strong className="text-xs">{results.adjustedSelfPensionMonthly}万円/月</strong>
-                        {inputs.hasSpouse && (
-                          <>
-                            、配偶者受給額：<strong className="text-xs">{results.adjustedSpousePensionMonthly}万円/月</strong>
-                            （配偶者も同じ年齢で請求するものとして同率で補正）
-                          </>
-                        )}
                         {results.pensionClaimAge !== results.safeRetirementAge && (
                           <>
                             （{results.pensionClaimAge}歳で請求したものとして計算。
@@ -807,6 +798,19 @@ export default function Home() {
                       <p className="text-[8px] text-muted-foreground leading-tight">
                         ※「基礎年金のみ」は、40年間満額納付した場合の国民年金満額（年額80万円 ≒ 月額{SPOUSE_BASIC_PENSION_ONLY_MONTHLY}万円）です。ボタンは初期値の入力補助なので、金額はご自由に修正してください。
                       </p>
+
+                      {/* F. 退職年齢に合わせた配偶者分の繰上げ・繰下げ補正（本人と同率） */}
+                      <div className="p-2 bg-amber-500/5 border border-amber-500/10 rounded text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        {results.pensionAdjustmentFactor === 1 ? (
+                          <span>F. 退職年齢は65歳のため、補正なしでそのまま月額 <strong>{inputs.spousePensionIncome}万円</strong> を適用します。</span>
+                        ) : (
+                          <span>
+                            → 配偶者も同じ{results.pensionClaimAge}歳で請求するものとして同率（{results.pensionClaimMonthsFromBase < 0 ? "0.4" : "0.7"}%×{Math.abs(results.pensionClaimMonthsFromBase)}ヶ月＝
+                            <strong>{(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%{results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}</strong>
+                            ）で補正すると、配偶者受給額：<strong className="text-xs">{results.adjustedSpousePensionMonthly}万円/月</strong>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 
