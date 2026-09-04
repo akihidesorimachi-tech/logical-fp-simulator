@@ -478,11 +478,11 @@ export default function Home() {
         {/* 2カラムレイアウト */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* 左カラム: 入力フォーム (5/12) - Sticky（追従）にして縦伸び余白を排除。
-              フォームの中身が画面の高さを超える端末（iPad横向きなど、幅は広いが
-              高さが低い画面）でも中身全体にたどり着けるよう、はみ出す分は
-              このカラム内だけで縦スクロールできるようにする */}
-          <div className="lg:col-span-5 lg:sticky lg:top-[70px] lg:max-h-[calc(100vh-86px)] lg:overflow-y-auto transition-all duration-200">
+          {/* 左カラム: 入力フォーム (5/12)。sticky固定はやめ、ページ全体と一緒に
+              スクロールする（固定＋内部スクロールだと、画面が低い端末で
+              フォーム下部に届きにくくなるため）。右の結果カラムは従来通り
+              ページスクロールに合わせて流れる */}
+          <div className="lg:col-span-5">
             <Card className="shadow-sm border-border bg-card overflow-hidden rounded-lg">
               <CardHeader className="bg-primary/5 border-b border-border/40 py-3 px-4">
                 <div className="flex items-center gap-1.5">
