@@ -7,8 +7,7 @@ export const PC_CAPTURE_WIDTH = 1280;
 
 export async function downloadElementAsImage(
   element: HTMLElement,
-  filename: string,
-  windowWidth: number
+  filename: string
 ) {
   // html2canvas は oklch()/oklab() をパースできないため、キャプチャ中だけ
   // ライブDOMの該当色を rgba() に一時置換し、完了後に元へ戻す。
@@ -18,7 +17,6 @@ export async function downloadElementAsImage(
   let canvas: HTMLCanvasElement;
   try {
     canvas = await html2canvas(element, {
-      windowWidth,
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",

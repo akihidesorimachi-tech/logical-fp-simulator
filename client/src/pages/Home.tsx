@@ -1,7 +1,20 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
 import { sanitizeNumericString } from "@/lib/utils";
 import DownloadButtons from "@/components/DownloadButtons";
+import { MOBILE_CAPTURE_WIDTH, PC_CAPTURE_WIDTH } from "@/lib/downloadImage";
+import {
+  BRAND,
+  newReportWorkbook,
+  addTitleBanner,
+  addSectionBanner,
+  addTableHeaderRow,
+  addDataTable,
+  addLabelValueRow,
+  downloadWorkbook,
+  NUM_FMT_MANEN,
+  NUM_FMT_PERCENT,
+  NUM_FMT_AGE,
+} from "@/lib/excelReport";
 import {
   Card, 
   CardContent, 
@@ -96,14 +109,27 @@ interface ChartDataPoint {
   netInvestedCumulative: number;
 }
 
+// 画像レポート内の「前提条件」1項目（ラベル＋値）
+function ReportItem({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className={highlight ? "p-2 rounded bg-emerald-500/5 border border-emerald-500/10" : "p-2"}>
+      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+      <p className={`text-xs font-bold mt-0.5 ${highlight ? "text-emerald-700" : "text-foreground"}`}>{value}</p>
+    </div>
+  );
+}
+
 export default function Home() {
   // 画面遷移時にスクロール位置を最上部にリセット
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  // 画像ダウンロード時にキャプチャする対象（ページ全体）
-  const pageRef = useRef<HTMLDivElement>(null);
+  // 画像ダウンロード時にキャプチャする対象。入力フォームなどのUIは含めず、
+  // 前提条件と結果だけをまとめた専用レポート（画面外に非表示描画）を、
+  // スマホ幅・PC幅それぞれ専用に用意する（理由は下のレポートJSXのコメント参照）
+  const mobileReportRef = useRef<HTMLDivElement>(null);
+  const pcReportRef = useRef<HTMLDivElement>(null);
 
   // デフォルト入力値（「標準的な夫婦」プリセットと同じ値にしておく。
   // ここがプリセットの値とズレていると、初期表示でプリセットボタンが
@@ -403,41 +429,60 @@ export default function Home() {
     };
   }, [inputs]);
 
-  // Excelダウンロード（スマホ用/PC用でファイル名のみ変える。
-  // データ内容自体は共通で、老後期間の推移は画面表示の4行ピックアップではなく全期間を出力する）
-  const handleDownloadExcel = (orientation: "portrait" | "landscape") => {
-    const wb = XLSX.utils.book_new();
+  // Excelダウンロード（スマホ用/PC用でファイル名のみ変える。データ内容自体は共通。
+  // ブランドカラーの帯・罫線・ゼブラ縞・数値書式・見出し行固定などで見やすく装飾し、
+  // 老後期間の推移は画面表示の4行ピックアップではなく全期間を年次テーブルで出力する）
+  const handleDownloadExcel = async (orientation: "portrait" | "landscape") => {
+    const wb = newReportWorkbook("老後必要資金シミュレーション結果");
+    const generatedAt = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
+    const subtitle = `生成日: ${generatedAt}　｜　LOGICAL FP 1級FP推計モデル`;
 
-    const inputRows: (string | number)[][] = [
-      ["項目", "値"],
-      ["A. 希望の生活費（月額）", `${inputs.livingCost}万円`],
-      ["B. 住宅費（月額）", `${inputs.housingCost}万円`],
-      ["C. ゆとり費（年額）", `${inputs.leisureCost}万円`],
-      ["D. 想定インフレ率（年率）", `${inputs.inflationRate}%`],
-      ["E. 現在年齢", `${inputs.currentAge}歳`],
-      ["F. 退職年齢", `${inputs.retirementAge}歳`],
-      ["G. 逝去年齢", `${inputs.deathAge}歳`],
-      ["H. 65歳受給の場合の想定年金受給額（月額・ご本人）", `${inputs.pensionIncome}万円`],
-      ["配偶者の年金を合算", inputs.hasSpouse ? "あり" : "なし"],
-      ...(inputs.hasSpouse ? [["配偶者の想定年金受給額（65歳受給の場合・月額）", `${inputs.spousePensionIncome}万円`]] : []),
-      ["退職年齢に応じた年金請求の補正", results.pensionAdjustmentFactor === 1
-        ? "補正なし（65歳で請求）"
-        : `${results.pensionClaimAge}歳で請求（65歳基準から${(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%${results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}）`],
-      ["補正後のご本人年金受給額（月額）", `${results.adjustedSelfPensionMonthly}万円`],
-      ...(inputs.hasSpouse ? [["補正後の配偶者年金受給額（月額）", `${results.adjustedSpousePensionMonthly}万円`]] : []),
-    ];
+    // --- サマリーシート（前提条件 + 結果サマリー） ---
+    const wsSummary = wb.addWorksheet("サマリー", { views: [{ showGridLines: false }] });
+    wsSummary.columns = [{ width: 46 }, { width: 26 }];
+    addTitleBanner(wsSummary, "老後必要資金シミュレーション結果", subtitle, 2);
 
-    const summaryRows: (string | number)[][] = [
-      ["項目", "値（万円）"],
-      ["老後生活期間", `${results.retirementDuration}年間（${results.safeRetirementAge}歳〜${results.safeDeathAge}歳）`],
-      ["① 運用せず現金取り崩し：支出累計", results.totalCostNoInvestment],
-      ["① 運用せず現金取り崩し：自己準備必要額（差額）", results.netRequiredNoInvestment],
-      ["② 運用しながら取り崩す：運用調整支出額", results.totalCostWithInvestment],
-      ["② 運用しながら取り崩す：自己準備必要額（差額）", results.netRequiredWithInvestment],
-      ["年金受給総額（名目固定）", results.totalPensionNominal],
-      ["運用による削減効果", results.netInvestmentBenefit],
-    ];
+    let r = 4;
+    addSectionBanner(wsSummary, r, "前提条件（ご入力いただいた内容）", 2);
+    r++;
+    addTableHeaderRow(wsSummary, r, ["項目", "値"]);
+    r++;
 
+    const zebra = () => (r % 2 === 0);
+    addLabelValueRow(wsSummary, r++, "A. 希望の生活費（月額）", inputs.livingCost, { numFmt: '#,##0"万円/月"', zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "B. 住宅費（月額）", inputs.housingCost, { numFmt: '#,##0"万円/月"', zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "C. ゆとり費（年額）", inputs.leisureCost, { numFmt: '#,##0"万円/年"', zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "D. 想定インフレ率（年率）", inputs.inflationRate, { numFmt: NUM_FMT_PERCENT, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "E. 現在年齢", inputs.currentAge, { numFmt: NUM_FMT_AGE, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "F. 退職年齢", inputs.retirementAge, { numFmt: NUM_FMT_AGE, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "G. 逝去年齢", inputs.deathAge, { numFmt: NUM_FMT_AGE, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "老後生活期間", `${results.retirementDuration}年間（${results.safeRetirementAge}歳〜${results.safeDeathAge}歳）`, { bold: false, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "H. 65歳受給の場合の想定年金受給額（月額・ご本人）", inputs.pensionIncome, { numFmt: '#,##0"万円/月"', zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "退職年齢に応じた年金請求の補正", results.pensionAdjustmentFactor === 1
+      ? "補正なし（65歳で請求）"
+      : `${results.pensionClaimAge}歳で請求（65歳基準から${(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%${results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}）`,
+      { bold: false, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "補正後のご本人年金受給額（月額）", results.adjustedSelfPensionMonthly, { numFmt: '#,##0.0"万円/月"', color: BRAND.emerald, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "配偶者の年金を合算", inputs.hasSpouse ? "あり" : "なし", { bold: false, zebra: zebra() });
+    if (inputs.hasSpouse) {
+      addLabelValueRow(wsSummary, r++, "配偶者の想定年金受給額（65歳受給の場合・月額）", inputs.spousePensionIncome, { numFmt: '#,##0"万円/月"', zebra: zebra() });
+      addLabelValueRow(wsSummary, r++, "補正後の配偶者年金受給額（月額）", results.adjustedSpousePensionMonthly, { numFmt: '#,##0.0"万円/月"', color: BRAND.emerald, zebra: zebra() });
+    }
+
+    r++; // スペーサー
+    addSectionBanner(wsSummary, r, "結果サマリー（老後" + results.retirementDuration + "年間合計）", 2);
+    r++;
+    addTableHeaderRow(wsSummary, r, ["項目", "値（万円）"]);
+    r++;
+
+    addLabelValueRow(wsSummary, r++, "① 運用せず現金取り崩し：支出累計", results.totalCostNoInvestment, { numFmt: NUM_FMT_MANEN, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "① 運用せず現金取り崩し：自己準備必要額（差額）", results.netRequiredNoInvestment, { numFmt: NUM_FMT_MANEN, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "② 運用しながら取り崩す：運用調整支出額", results.totalCostWithInvestment, { numFmt: NUM_FMT_MANEN, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "② 運用しながら取り崩す：自己準備必要額（差額）", results.netRequiredWithInvestment, { numFmt: NUM_FMT_MANEN, color: BRAND.navy, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "年金受給総額（名目固定）", results.totalPensionNominal, { numFmt: NUM_FMT_MANEN, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "運用による削減効果", results.netInvestmentBenefit, { numFmt: NUM_FMT_MANEN, color: BRAND.emerald, fill: BRAND.emeraldFill });
+
+    // --- 年次推移シート（全期間） ---
     const yearlyHeader = ["年齢", "経過年", "生活費(年)", "住宅費(年)", "ゆとり費(年)", "年間支出合計(インフレ後)", "年金(年額)", "年金累計", "①運用なし累計自己準備", "②運用あり累計自己準備", "運用効果(差)"];
     const yearlyRows = results.chartData.map(d => [
       d.age,
@@ -453,22 +498,20 @@ export default function Home() {
       d.netCashCumulative - d.netInvestedCumulative,
     ]);
 
-    const wsInput = XLSX.utils.aoa_to_sheet(inputRows);
-    wsInput['!cols'] = [{ wch: 42 }, { wch: 28 }];
-    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-    wsSummary['!cols'] = [{ wch: 42 }, { wch: 16 }];
-    const wsYearly = XLSX.utils.aoa_to_sheet([yearlyHeader, ...yearlyRows]);
-    wsYearly['!cols'] = yearlyHeader.map(() => ({ wch: 14 }));
+    const wsYearly = wb.addWorksheet("年次推移（全期間）", { views: [{ showGridLines: false }] });
+    wsYearly.columns = yearlyHeader.map(() => ({ width: 15 }));
+    addTitleBanner(wsYearly, "老後期間の年次推移（全" + results.retirementDuration + "年間）", subtitle, yearlyHeader.length);
+    addDataTable(wsYearly, 4, yearlyHeader, yearlyRows, {
+      numFmt: "#,##0",
+      freezeHeader: true,
+      highlightLastRow: true,
+    });
 
-    XLSX.utils.book_append_sheet(wb, wsInput, "入力条件");
-    XLSX.utils.book_append_sheet(wb, wsSummary, "サマリー");
-    XLSX.utils.book_append_sheet(wb, wsYearly, "年次推移（全期間）");
-
-    XLSX.writeFile(wb, `老後資金シミュレーション_${orientation === "portrait" ? "スマホ用" : "PC用"}.xlsx`);
+    await downloadWorkbook(wb, `老後資金シミュレーション_${orientation === "portrait" ? "スマホ用" : "PC用"}.xlsx`);
   };
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-background text-foreground font-sans-jp flex flex-col selection:bg-accent selection:text-accent-foreground">
+    <div className="min-h-screen bg-background text-foreground font-sans-jp flex flex-col selection:bg-accent selection:text-accent-foreground">
       {/* ヘッダー */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50 transition-all duration-200">
         <div className="container py-2 flex items-center justify-between">
@@ -538,7 +581,7 @@ export default function Home() {
 
         {/* 結果ダウンロード */}
         <div className="max-w-3xl mx-auto mb-4">
-          <DownloadButtons captureRef={pageRef} filenameBase="老後資金シミュレーション" onDownloadExcel={handleDownloadExcel} />
+          <DownloadButtons captureRefs={{ mobile: mobileReportRef, pc: pcReportRef }} filenameBase="老後資金シミュレーション" onDownloadExcel={handleDownloadExcel} />
         </div>
 
         {/* 警告表示 */}
@@ -1318,6 +1361,210 @@ export default function Home() {
 
         </div>
       </main>
+
+      {/* 画像ダウンロード用の非表示レポート。入力フォームやボタンなどの操作UIは含めず、
+          入力いただいた前提条件と計算結果だけをまとめた印刷物風のレイアウトで、
+          画面外に配置して html2canvas でキャプチャする。
+          Rechartsのグラフは実DOMの幅を測ってSVGサイズを確定するため、html2canvasの
+          windowWidthによる仮想的な再レイアウトだけでは正しく追従できない。そのため
+          スマホ幅・PC幅それぞれ専用の要素を常時実DOM上にレンダリングしておき、
+          ボタンごとに対応する方だけをキャプチャする */}
+      {(["mobile", "pc"] as const).map(variant => {
+        const isPc = variant === "pc";
+        return (
+          <div
+            key={variant}
+            ref={isPc ? pcReportRef : mobileReportRef}
+            className="fixed top-0 -left-[9999px] pointer-events-none"
+            style={{ width: `${isPc ? PC_CAPTURE_WIDTH : MOBILE_CAPTURE_WIDTH}px` }}
+            aria-hidden="true"
+          >
+            <div className={`bg-background text-foreground font-sans-jp ${isPc ? "p-10" : "p-6"}`}>
+              {/* ヘッダー */}
+              <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-primary mb-6">
+                <div className="flex items-center gap-3">
+                  <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" className="h-10 object-contain" />
+                  <div className="h-8 w-[1px] bg-border" />
+                  <div>
+                    <h2 className={`${isPc ? "text-lg" : "text-base"} font-bold text-foreground leading-tight`}>老後必要資金シミュレーション結果</h2>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      LOGICAL FP - 1級FP推計モデル ｜ 生成日: {new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 前提条件 */}
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-primary" />
+                  前提条件（ご入力いただいた内容）
+                </h3>
+                <div className={`grid ${isPc ? "grid-cols-4" : "grid-cols-2"} gap-2 p-3 bg-muted/20 rounded-lg border border-border/40`}>
+                  <ReportItem label="A. 希望の生活費（月額）" value={`${inputs.livingCost} 万円/月`} />
+                  <ReportItem label="B. 住宅費（月額）" value={`${inputs.housingCost} 万円/月`} />
+                  <ReportItem label="C. ゆとり費（年額）" value={`${inputs.leisureCost} 万円/年`} />
+                  <ReportItem label="D. 想定インフレ率（年率）" value={`${inputs.inflationRate} %`} />
+                  <ReportItem label="E〜G. 年齢設定" value={`${inputs.currentAge}歳 → ${results.safeRetirementAge}歳 → ${results.safeDeathAge}歳`} />
+                  <ReportItem label="老後生活期間" value={`${results.retirementDuration}年間`} />
+                  <ReportItem label="H. 想定年金額（65歳受給・本人）" value={`${inputs.pensionIncome} 万円/月`} />
+                  <ReportItem label="補正後のご本人年金額（月額）" value={`${results.adjustedSelfPensionMonthly} 万円/月`} highlight />
+                  {inputs.hasSpouse && (
+                    <ReportItem label="配偶者の想定年金額（65歳受給）" value={`${inputs.spousePensionIncome} 万円/月`} />
+                  )}
+                  {inputs.hasSpouse && (
+                    <ReportItem label="補正後の配偶者年金額（月額）" value={`${results.adjustedSpousePensionMonthly} 万円/月`} highlight />
+                  )}
+                </div>
+              </div>
+
+              {/* 結果サマリー：現金 vs 運用の対比 */}
+              <div className={`grid ${isPc ? "grid-cols-2" : "grid-cols-1"} gap-4 mb-6`}>
+                <Card className="border-border/60 shadow-sm relative overflow-hidden bg-card">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-muted" />
+                  <CardHeader className="pb-2 pt-4 px-4">
+                    <CardTitle className="text-xs font-bold text-muted-foreground flex items-center gap-1">
+                      <Coins className="w-3.5 h-3.5" />
+                      ① 運用せず現金取り崩し
+                    </CardTitle>
+                    <CardDescription className="text-[10px] mt-0.5">老後期間の現金単純取り崩しでの自己準備額</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-4">
+                    <span className="text-2xl font-black tracking-tight text-foreground">{formatManen(results.netRequiredNoInvestment)}</span>
+                    <p className="text-[10px] text-muted-foreground mt-1">引退時（{results.safeRetirementAge}歳）に必要な自己準備額（差額）</p>
+                    <div className="mt-3 pt-3 border-t border-border/40 text-[10px] text-muted-foreground space-y-1 bg-muted/20 p-2 rounded">
+                      <div className="flex justify-between">
+                        <span>支出累計:</span>
+                        <span className="font-semibold text-foreground">{formatManen(results.totalCostNoInvestment)}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-700">
+                        <span>年金受給総額（名目固定）:</span>
+                        <span>- {formatManen(results.totalPensionNominal)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-primary/20 shadow-sm relative overflow-hidden bg-primary/[0.02]">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
+                  <CardHeader className="pb-2 pt-4 px-4">
+                    <CardTitle className="text-xs font-bold text-primary flex items-center gap-1">
+                      <Percent className="w-3.5 h-3.5" />
+                      ② 運用しながら取り崩す
+                    </CardTitle>
+                    <CardDescription className="text-[10px] mt-0.5">引退時（{results.safeRetirementAge}歳）に必要な自己準備額（差額）</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-4">
+                    <span className="text-2xl font-black tracking-tight text-primary">{formatManen(results.netRequiredWithInvestment)}</span>
+                    <p className="text-[10px] text-primary/80 font-medium mt-1">
+                      運用なしと比べ <strong className="text-xs underline">{formatManen(results.netInvestmentBenefit)}</strong> 少なく済みます（運用効果）。
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-primary/10 text-[10px] text-muted-foreground space-y-1 bg-primary/[0.04] p-2 rounded">
+                      <div className="flex justify-between">
+                        <span>運用調整支出額:</span>
+                        <span className="font-semibold text-foreground">{formatManen(results.totalCostWithInvestment)}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-700">
+                        <span>年金受給総額（名目固定）:</span>
+                        <span>- {formatManen(results.totalPensionNominal)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* グラフ */}
+              <Card className="border-border/60 shadow-sm bg-card overflow-hidden mb-6">
+                <CardHeader className="py-3 px-4 border-b border-border/40">
+                  <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <LineChart className="w-4 h-4 text-primary" />
+                    自己準備必要額（差額）の累計推移比較
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={results.chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id={`colorCashReport-${variant}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.02} />
+                          </linearGradient>
+                          <linearGradient id={`colorInvestedReport-${variant}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#2563EB" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                        <XAxis dataKey="age" tickFormatter={(value) => `${value}歳`} tick={{ fontSize: 9 }} stroke="#9CA3AF" />
+                        <YAxis tickFormatter={(value) => `${value}万`} tick={{ fontSize: 9 }} stroke="#9CA3AF" />
+                        <Legend verticalAlign="top" height={36} iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
+                        <Area name="① 運用なし（現金単純取り崩し）の自己準備額" type="monotone" dataKey="netCashCumulative" stroke="#F59E0B" strokeWidth={1.5} fillOpacity={1} fill={`url(#colorCashReport-${variant})`} isAnimationActive={false} />
+                        <Area name="② 運用あり（インフレ相当運用）の自己準備額" type="monotone" dataKey="netInvestedCumulative" stroke="#2563EB" strokeWidth={2} fillOpacity={1} fill={`url(#colorInvestedReport-${variant})`} isAnimationActive={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 年次推移ピックアップ */}
+              <Card className="border-border/60 shadow-sm bg-card overflow-hidden mb-6">
+                <CardHeader className="py-3 px-4 border-b border-border/40">
+                  <CardTitle className="text-xs font-bold text-foreground">老後期間の具体的な数値推移（節目ピックアップ）</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-muted/40 border-b border-border/60 text-muted-foreground font-semibold">
+                        <th className="p-2.5">年齢</th>
+                        <th className="p-2.5">経過年</th>
+                        <th className="p-2.5 text-right">年間支出</th>
+                        <th className="p-2.5 text-right">①運用なし累計</th>
+                        <th className="p-2.5 text-right">②運用あり累計</th>
+                        <th className="p-2.5 text-right text-primary">運用効果</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {[
+                        { idx: 0, label: "引退初年度" },
+                        { idx: 4, label: "5年後" },
+                        { idx: 14, label: "15年後" },
+                      ].filter(({ idx }) => results.chartData.length > idx).map(({ idx, label }) => (
+                        <tr key={idx}>
+                          <td className="p-2.5 font-medium">{results.chartData[idx].age}歳</td>
+                          <td className="p-2.5 text-muted-foreground">{label}</td>
+                          <td className="p-2.5 text-right">{results.chartData[idx].totalCostYearly.toLocaleString()} 万円</td>
+                          <td className="p-2.5 text-right font-semibold">{results.chartData[idx].netCashCumulative.toLocaleString()} 万円</td>
+                          <td className="p-2.5 text-right font-semibold">{results.chartData[idx].netInvestedCumulative.toLocaleString()} 万円</td>
+                          <td className="p-2.5 text-right font-bold text-primary">
+                            {(results.chartData[idx].netCashCumulative - results.chartData[idx].netInvestedCumulative).toLocaleString()} 万円
+                          </td>
+                        </tr>
+                      ))}
+                      {results.chartData.length > 0 && (
+                        <tr className="bg-primary/[0.01] font-semibold border-t border-border/80">
+                          <td className="p-2.5 text-primary">{results.chartData[results.chartData.length - 1].age}歳</td>
+                          <td className="p-2.5 text-primary">最終年</td>
+                          <td className="p-2.5 text-right">{results.chartData[results.chartData.length - 1].totalCostYearly.toLocaleString()} 万円</td>
+                          <td className="p-2.5 text-right text-foreground font-bold">{formatManen(results.netRequiredNoInvestment)}</td>
+                          <td className="p-2.5 text-right text-primary font-bold">{formatManen(results.netRequiredWithInvestment)}</td>
+                          <td className="p-2.5 text-right font-black text-primary text-xs">{formatManen(results.netInvestmentBenefit)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+
+              {/* フッター */}
+              <div className="pt-3 border-t border-border text-center text-[9px] text-muted-foreground leading-relaxed">
+                © 2026 LOGICAL FP - 1級ファイナンシャルプランナー監修ライフプランシステム. All rights reserved.<br />
+                本ツールで算出される数値は、入力条件や簡易的な前提（想定利回り・インフレ率・年金制度等）に基づく試算であり、将来の運用成果や必要資金・年金受給額を保証するものではありません。
+              </div>
+            </div>
+          </div>
+        );
+      })}
 
       {/* フッター */}
       <footer className="border-t border-border bg-card py-6 mt-12">

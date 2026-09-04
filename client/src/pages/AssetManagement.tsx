@@ -1,9 +1,21 @@
 import React, { useState, useMemo, useRef } from "react";
 import { Link } from "wouter";
-import * as XLSX from "xlsx";
 import { sanitizeNumericString } from "@/lib/utils";
 import Disclaimer from "@/components/Disclaimer";
 import DownloadButtons from "@/components/DownloadButtons";
+import { MOBILE_CAPTURE_WIDTH, PC_CAPTURE_WIDTH } from "@/lib/downloadImage";
+import {
+  BRAND,
+  newReportWorkbook,
+  addTitleBanner,
+  addSectionBanner,
+  addTableHeaderRow,
+  addDataTable,
+  addLabelValueRow,
+  downloadWorkbook,
+  NUM_FMT_MANEN,
+  NUM_FMT_MULTIPLE,
+} from "@/lib/excelReport";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,8 +70,11 @@ export default function AssetManagement() {
     window.scrollTo(0, 0);
   }, []);
 
-  // 画像ダウンロード時にキャプチャする対象（ページ全体）
-  const pageRef = useRef<HTMLDivElement>(null);
+  // 画像ダウンロード時にキャプチャする対象。入力フォームなどのUIは含めず、
+  // 前提条件と結果だけをまとめた専用レポート（画面外に非表示描画）を、
+  // スマホ幅・PC幅それぞれ専用に用意する（理由は下のレポートJSXのコメント参照）
+  const mobileReportRef = useRef<HTMLDivElement>(null);
+  const pcReportRef = useRef<HTMLDivElement>(null);
 
   // 共通設定：資産取り崩し開始 (X年後)
   const [yearsToRetire, setYearsToRetire] = useState<number>(30);
@@ -328,12 +343,24 @@ export default function AssetManagement() {
   const assetClassLabel = (c: Asset["assetClass"]) =>
     c === "risk" ? "リスク資産" : c === "safe" ? "安全資産" : "コモディティ";
 
-  // Excelダウンロード（スマホ用/PC用でファイル名のみ変える。
-  // データ内容自体は共通で、将来推移は画面表示の年数ピックアップではなく全期間を出力する）
-  const handleDownloadExcel = (orientation: "portrait" | "landscape") => {
-    const wb = XLSX.utils.book_new();
+  // Excelダウンロード（スマホ用/PC用でファイル名のみ変える。データ内容自体は共通。
+  // ブランドカラーの帯・罫線・ゼブラ縞・数値書式・見出し行固定などで見やすく装飾し、
+  // 将来推移は画面表示の年数ピックアップではなく全期間を年次テーブルで出力する）
+  const handleDownloadExcel = async (orientation: "portrait" | "landscape") => {
+    const wb = newReportWorkbook("複数資産ポートフォリオ・シミュレーション結果");
+    const generatedAt = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
+    const subtitle = `生成日: ${generatedAt}　｜　LOGICAL FP 1級FP運用モデル`;
 
-    const assetHeader = ["資産名", "資産クラス", "現在保有価額(万円)", "積立種別", "想定積立額(万円)", "想定利回り(%)", "積立年数"];
+    // --- サマリーシート（前提条件：資産一覧 + 結果サマリー） ---
+    const wsSummary = wb.addWorksheet("サマリー", { views: [{ showGridLines: false }] });
+    const assetColCount = 7;
+    wsSummary.columns = [{ width: 24 }, { width: 14 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 12 }, { width: 10 }];
+    addTitleBanner(wsSummary, "複数資産ポートフォリオ・シミュレーション結果", subtitle, assetColCount);
+
+    let r = 4;
+    addSectionBanner(wsSummary, r, "前提条件：登録資産一覧", assetColCount);
+    r++;
+    const assetHeader = ["資産名", "資産クラス", "現在保有価額(万円)", "積立種別", "想定積立額(万円)", "想定利回り(%)", "積立年数(年)"];
     const assetRows = assets.map(a => [
       a.name,
       assetClassLabel(a.assetClass),
@@ -343,38 +370,44 @@ export default function AssetManagement() {
       a.expectedReturn,
       a.yearsToContribute,
     ]);
+    r = addDataTable(wsSummary, r, assetHeader, assetRows) + 1;
 
-    const summaryRows: (string | number)[][] = [
-      ["項目", "値"],
-      ["共通設定：資産取り崩し開始（評価時点）", `${yearsToRetire}年後`],
-      [`${yearsToRetire}年後の将来予測結果（合計評価額）`, `${totalFinalValue}万円`],
-      ["投資元本累計", `${totalInvested}万円`],
-      ["運用益累計", `${totalEarnings}万円`],
-      ["運用倍率", totalInvested > 0 ? `${(totalFinalValue / totalInvested).toFixed(2)}倍` : "1.00倍"],
-      ["リスク資産（最終年）", `${finalYearData.risk}万円（${riskRatio.toFixed(1)}%）`],
-      ["安全資産（最終年）", `${finalYearData.safe}万円（${safeRatio.toFixed(1)}%）`],
-      ["コモディティ（最終年）", `${finalYearData.commodity}万円（${commodityRatio.toFixed(1)}%）`],
-    ];
+    r++; // スペーサー
+    addLabelValueRow(wsSummary, r++, "共通設定：資産取り崩し開始（評価時点）", `${yearsToRetire}年後`, { bold: true });
 
+    r++; // スペーサー
+    addSectionBanner(wsSummary, r, `結果サマリー（${yearsToRetire}年後時点）`, assetColCount);
+    r++;
+    addTableHeaderRow(wsSummary, r, ["項目", "値（万円）", "", "", "", "", ""]);
+    r++;
+
+    const zebra = () => (r % 2 === 0);
+    addLabelValueRow(wsSummary, r++, `${yearsToRetire}年後の将来予測結果（合計評価額）`, totalFinalValue, { numFmt: NUM_FMT_MANEN, color: BRAND.navy, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "投資元本累計", totalInvested, { numFmt: NUM_FMT_MANEN, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "運用益累計", totalEarnings, { numFmt: NUM_FMT_MANEN, color: BRAND.emerald, fill: BRAND.emeraldFill });
+    addLabelValueRow(wsSummary, r++, "運用倍率", totalInvested > 0 ? totalFinalValue / totalInvested : 1, { numFmt: NUM_FMT_MULTIPLE, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "リスク資産（最終年）", `${finalYearData.risk.toLocaleString()}万円（${riskRatio.toFixed(1)}%）`, { bold: false, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "安全資産（最終年）", `${finalYearData.safe.toLocaleString()}万円（${safeRatio.toFixed(1)}%）`, { bold: false, zebra: zebra() });
+    addLabelValueRow(wsSummary, r++, "コモディティ（最終年）", `${finalYearData.commodity.toLocaleString()}万円（${commodityRatio.toFixed(1)}%）`, { bold: false, zebra: zebra() });
+
+    // --- 年次推移シート（全期間） ---
     const yearlyHeader = ["年", "リスク資産", "安全資産", "コモディティ", "合計評価額", "投資元本累計", "運用益累計"];
     const yearlyRows = yearlyData.map(d => [d.year, d.risk, d.safe, d.commodity, d.total, d.invested, d.total - d.invested]);
 
-    const wsAssets = XLSX.utils.aoa_to_sheet([assetHeader, ...assetRows]);
-    wsAssets['!cols'] = assetHeader.map(() => ({ wch: 16 }));
-    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-    wsSummary['!cols'] = [{ wch: 36 }, { wch: 22 }];
-    const wsYearly = XLSX.utils.aoa_to_sheet([yearlyHeader, ...yearlyRows]);
-    wsYearly['!cols'] = yearlyHeader.map(() => ({ wch: 14 }));
+    const wsYearly = wb.addWorksheet("年次推移（全期間）", { views: [{ showGridLines: false }] });
+    wsYearly.columns = yearlyHeader.map(() => ({ width: 15 }));
+    addTitleBanner(wsYearly, `資産総額の年次推移（全${yearsToRetire}年間）`, subtitle, yearlyHeader.length);
+    addDataTable(wsYearly, 4, yearlyHeader, yearlyRows, {
+      numFmt: "#,##0",
+      freezeHeader: true,
+      highlightLastRow: true,
+    });
 
-    XLSX.utils.book_append_sheet(wb, wsAssets, "資産一覧");
-    XLSX.utils.book_append_sheet(wb, wsSummary, "サマリー");
-    XLSX.utils.book_append_sheet(wb, wsYearly, "年次推移（全期間）");
-
-    XLSX.writeFile(wb, `資産運用シミュレーション_${orientation === "portrait" ? "スマホ用" : "PC用"}.xlsx`);
+    await downloadWorkbook(wb, `資産運用シミュレーション_${orientation === "portrait" ? "スマホ用" : "PC用"}.xlsx`);
   };
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-[oklch(0.99_0.003_40)] text-[oklch(0.25_0.01_50)] font-sans">
+    <div className="min-h-screen bg-[oklch(0.99_0.003_40)] text-[oklch(0.25_0.01_50)] font-sans">
       {/* 装飾用背景パターン */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,oklch(0.95_0.02_45_/_0.4),transparent_45%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,oklch(0.96_0.01_55_/_0.3),transparent_50%)] pointer-events-none" />
@@ -417,7 +450,7 @@ export default function AssetManagement() {
 
         {/* 結果ダウンロード */}
         <div className="max-w-3xl mx-auto mb-8">
-          <DownloadButtons captureRef={pageRef} filenameBase="資産運用シミュレーション" onDownloadExcel={handleDownloadExcel} />
+          <DownloadButtons captureRefs={{ mobile: mobileReportRef, pc: pcReportRef }} filenameBase="資産運用シミュレーション" onDownloadExcel={handleDownloadExcel} />
         </div>
 
         {/* 共通設定エリア */}
@@ -892,6 +925,212 @@ export default function AssetManagement() {
 
         </div>
       </main>
+
+      {/* 画像ダウンロード用の非表示レポート。資産の追加・編集などの操作UIは含めず、
+          登録済み資産の前提条件と計算結果だけをまとめた印刷物風のレイアウトで、
+          画面外に配置して html2canvas でキャプチャする。
+          Rechartsのグラフは実DOMの幅を測ってSVGサイズを確定するため、html2canvasの
+          windowWidthによる仮想的な再レイアウトだけでは正しく追従できない。そのため
+          スマホ幅・PC幅それぞれ専用の要素を常時実DOM上にレンダリングしておき、
+          ボタンごとに対応する方だけをキャプチャする */}
+      {(["mobile", "pc"] as const).map(variant => {
+        const isPc = variant === "pc";
+        return (
+          <div
+            key={variant}
+            ref={isPc ? pcReportRef : mobileReportRef}
+            className="fixed top-0 -left-[9999px] pointer-events-none"
+            style={{ width: `${isPc ? PC_CAPTURE_WIDTH : MOBILE_CAPTURE_WIDTH}px` }}
+            aria-hidden="true"
+          >
+            <div className={`bg-background text-foreground font-sans ${isPc ? "p-10" : "p-6"}`}>
+              {/* ヘッダー */}
+              <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-primary mb-6">
+                <div className="flex items-center gap-3">
+                  <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" className="h-10 object-contain" />
+                  <div className="h-8 w-[1px] bg-border" />
+                  <div>
+                    <h2 className={`${isPc ? "text-lg" : "text-base"} font-bold text-foreground leading-tight`}>複数資産ポートフォリオ・シミュレーション結果</h2>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      LOGICAL FP - 1級FP運用モデル ｜ 生成日: {new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 前提条件：登録資産一覧 */}
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                  <Briefcase className="w-4 h-4 text-primary" />
+                  前提条件：登録資産一覧（取り崩し開始：{yearsToRetire}年後）
+                </h3>
+                <div className="rounded-lg border border-border/40 overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-muted/40 border-b border-border/60 text-muted-foreground font-semibold">
+                        <th className="p-2">資産名</th>
+                        <th className="p-2">資産クラス</th>
+                        <th className="p-2 text-right">現在保有価額</th>
+                        <th className="p-2 text-right">想定積立額</th>
+                        <th className="p-2 text-right">想定利回り</th>
+                        <th className="p-2 text-right">積立年数</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {assets.map(a => (
+                        <tr key={a.id}>
+                          <td className="p-2 font-medium">{a.name}</td>
+                          <td className="p-2 text-muted-foreground">{assetClassLabel(a.assetClass)}</td>
+                          <td className="p-2 text-right">{a.currentValue.toLocaleString()} 万円</td>
+                          <td className="p-2 text-right">{a.contributionValue.toLocaleString()} 万円/{a.contributionType === "monthly" ? "月" : "年"}</td>
+                          <td className="p-2 text-right">{a.expectedReturn} %</td>
+                          <td className="p-2 text-right">{a.yearsToContribute} 年間</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 結果サマリー */}
+              <Card className="border-border bg-gradient-to-br from-card to-primary/5 shadow-md overflow-hidden relative rounded-lg mb-6">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs font-bold text-primary uppercase tracking-wider">
+                    {yearsToRetire}年後の将来予測結果
+                  </CardDescription>
+                  <CardTitle className="text-2xl font-extrabold text-foreground">{formatYen(totalFinalValue)}</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-3 gap-4 border-t border-border pt-4 text-xs">
+                    <div>
+                      <span className="text-muted-foreground block mb-1">投資元本累計</span>
+                      <span className="font-bold text-foreground text-sm">{formatYen(totalInvested)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">運用益累計</span>
+                      <span className="font-bold text-primary text-sm">+{formatYen(totalEarnings)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-1">運用倍率</span>
+                      <span className="font-bold text-foreground text-sm">
+                        {totalInvested > 0 ? (totalFinalValue / totalInvested).toFixed(2) : "1.00"} 倍
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 資産クラス内訳 */}
+              <Card className="border-border shadow-sm bg-card rounded-lg mb-6">
+                <CardHeader className="pb-2 border-b border-border/40">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
+                    <Coins className="w-4 h-4 text-primary" />
+                    {yearsToRetire}年後のポートフォリオ内訳
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {totalFinalValue === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-xs">資産が登録されていないか、すべて0円です。</div>
+                  ) : (
+                    <div className={`grid ${isPc ? "grid-cols-12" : "grid-cols-1"} gap-6 items-center`}>
+                      <div className={`${isPc ? "col-span-5" : ""} h-40 flex items-center justify-center relative`}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={classData} cx="50%" cy="50%" innerRadius={48} outerRadius={65} paddingAngle={3} dataKey="value" isAnimationActive={false}>
+                              {classData.map((entry, index) => (
+                                <Cell key={`report-cell-${variant}-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute text-center">
+                          <span className="text-[9px] text-muted-foreground block font-medium">合計資産</span>
+                          <span className="text-xs font-extrabold text-foreground block">
+                            {totalFinalValue >= 10000 ? `${(totalFinalValue / 10000).toFixed(1)}億円` : `${totalFinalValue}万円`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`${isPc ? "col-span-7" : ""} space-y-2`}>
+                        {[
+                          { label: "リスク資産", sub: "株式・投資信託・外貨・仮想通貨等", value: finalYearData.risk, ratio: riskRatio, color: "var(--chart-1)" },
+                          { label: "安全資産", sub: "日本国債・定期預金・現金等", value: finalYearData.safe, ratio: safeRatio, color: "var(--chart-2)" },
+                          { label: "コモディティ", sub: "金・プラチナ・原油等", value: finalYearData.commodity, ratio: commodityRatio, color: "var(--chart-3)" },
+                        ].map(item => (
+                          <div key={item.label} className="flex items-start justify-between gap-4 p-2 rounded">
+                            <div className="flex items-start gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0" style={{ backgroundColor: item.color }} />
+                              <div>
+                                <span className="font-bold text-xs text-foreground block">{item.label}</span>
+                                <span className="text-[9px] text-muted-foreground block">{item.sub}</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-xs text-foreground block">{formatYen(item.value)}</span>
+                              <span className="text-[9px] font-bold text-primary bg-primary/5 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                                {item.ratio.toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 将来推移グラフ */}
+              <Card className="border-border shadow-sm bg-card rounded-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    資産総額の将来推移予測（積み上げ）
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="h-64 w-full text-xs">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={yearlyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id={`colorRiskReport-${variant}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.6} />
+                            <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.05} />
+                          </linearGradient>
+                          <linearGradient id={`colorSafeReport-${variant}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.6} />
+                            <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0.05} />
+                          </linearGradient>
+                          <linearGradient id={`colorCommodityReport-${variant}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.6} />
+                            <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0.05} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="year" tickFormatter={(v) => `${v}年`} stroke="var(--muted-foreground)" />
+                        <YAxis tickFormatter={(v) => (v >= 10000 ? `${v / 10000}億` : `${v}万`)} stroke="var(--muted-foreground)" />
+                        <Legend
+                          formatter={(value) => {
+                            const labelMap: any = { risk: "リスク資産", safe: "安全資産", commodity: "コモディティ" };
+                            return labelMap[value] || value;
+                          }}
+                        />
+                        <Area type="monotone" dataKey="safe" stackId="1" stroke="var(--chart-2)" fillOpacity={1} fill={`url(#colorSafeReport-${variant})`} isAnimationActive={false} />
+                        <Area type="monotone" dataKey="risk" stackId="1" stroke="var(--chart-1)" fillOpacity={1} fill={`url(#colorRiskReport-${variant})`} isAnimationActive={false} />
+                        <Area type="monotone" dataKey="commodity" stackId="1" stroke="var(--chart-3)" fillOpacity={1} fill={`url(#colorCommodityReport-${variant})`} isAnimationActive={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* フッター */}
+              <div className="mt-6 pt-3 border-t border-border text-center text-[9px] text-muted-foreground leading-relaxed">
+                © 2026 LOGICAL FP — 1級ファイナンシャルプランナー監修ライフプランシステム<br />
+                本ツールで算出される数値は、入力条件や簡易的な前提（想定利回り等）に基づく試算であり、将来の運用成果を保証するものではありません。
+              </div>
+            </div>
+          </div>
+        );
+      })}
 
       {/* フッター */}
       <footer className="border-t border-border bg-white/50 py-6 text-center text-xs text-muted-foreground space-y-2">

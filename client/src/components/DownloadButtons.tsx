@@ -1,28 +1,35 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Smartphone, Monitor, Image as ImageIcon, FileSpreadsheet, Loader2 } from "lucide-react";
-import { downloadElementAsImage, MOBILE_CAPTURE_WIDTH, PC_CAPTURE_WIDTH } from "@/lib/downloadImage";
+import { downloadElementAsImage } from "@/lib/downloadImage";
 
 type DownloadKind = "image-mobile" | "image-pc" | "excel-mobile" | "excel-pc";
 
 interface DownloadButtonsProps {
-  captureRef: React.RefObject<HTMLElement | null>;
+  // Rechartsのグラフは実際のDOMの幅を測ってSVGサイズを確定するため、html2canvasの
+  // windowWidthだけでは正しく再レイアウトできない。そのため、あらかじめ実DOM上に
+  // スマホ幅・PC幅それぞれで正しくレンダリングされた別々の要素を用意してもらい、
+  // ボタンごとに対応するrefをキャプチャする
+  captureRefs: {
+    mobile: React.RefObject<HTMLElement | null>;
+    pc: React.RefObject<HTMLElement | null>;
+  };
   filenameBase: string;
-  onDownloadExcel: (orientation: "portrait" | "landscape") => void;
+  onDownloadExcel: (orientation: "portrait" | "landscape") => void | Promise<void>;
 }
 
-export default function DownloadButtons({ captureRef, filenameBase, onDownloadExcel }: DownloadButtonsProps) {
+export default function DownloadButtons({ captureRefs, filenameBase, onDownloadExcel }: DownloadButtonsProps) {
   const [loading, setLoading] = useState<DownloadKind | null>(null);
 
   const handleImageDownload = async (kind: "mobile" | "pc") => {
-    if (!captureRef.current) return;
+    const target = kind === "mobile" ? captureRefs.mobile.current : captureRefs.pc.current;
+    if (!target) return;
     const loadingKey: DownloadKind = kind === "mobile" ? "image-mobile" : "image-pc";
     setLoading(loadingKey);
     try {
       await downloadElementAsImage(
-        captureRef.current,
-        `${filenameBase}_${kind === "mobile" ? "スマホ用" : "PC用"}.png`,
-        kind === "mobile" ? MOBILE_CAPTURE_WIDTH : PC_CAPTURE_WIDTH
+        target,
+        `${filenameBase}_${kind === "mobile" ? "スマホ用" : "PC用"}.png`
       );
     } catch (e) {
       console.error(e);
@@ -32,11 +39,11 @@ export default function DownloadButtons({ captureRef, filenameBase, onDownloadEx
     }
   };
 
-  const handleExcelDownload = (kind: "mobile" | "pc") => {
+  const handleExcelDownload = async (kind: "mobile" | "pc") => {
     const loadingKey: DownloadKind = kind === "mobile" ? "excel-mobile" : "excel-pc";
     setLoading(loadingKey);
     try {
-      onDownloadExcel(kind === "mobile" ? "portrait" : "landscape");
+      await onDownloadExcel(kind === "mobile" ? "portrait" : "landscape");
     } catch (e) {
       console.error(e);
       window.alert("Excelファイルの生成に失敗しました。お手数ですが、もう一度お試しください。");
