@@ -745,6 +745,104 @@ export default function Home() {
                     )}
                   </div>
 
+                  {/* 年金概算アコーディオントリガー（ご本人分のみが対象） */}
+                  <div className="pt-1 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowEstimator(!showEstimator)}
+                      className="text-[10px] h-7 gap-1 px-2.5 border-emerald-200 hover:bg-emerald-50/50 text-emerald-700 hover:text-emerald-800"
+                    >
+                      <Calculator className="w-3 h-3" />
+                      {showEstimator ? "年収入力を閉じる" : "年収から概算する"}
+                    </Button>
+                  </div>
+
+                  {/* 年金概算ツール本体 */}
+                  {showEstimator && (
+                    <div className="mt-2 p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg space-y-2.5 transition-all duration-200">
+                      <h4 className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 leading-none">
+                        <UserCheck className="w-3.5 h-3.5" />
+                        公的年金（国民＋厚生年金）の簡易シミュレーター
+                      </h4>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="initialSalary" className="text-[9px] text-muted-foreground">社会人最初の年収</Label>
+                          <div className="relative">
+                            <Input
+                              id="initialSalary"
+                              type="text"
+                              inputMode="numeric"
+                              value={inputs.initialSalary === 0 ? "" : inputs.initialSalary}
+                              placeholder="0"
+                              onChange={(e) => handleInputChange('initialSalary', e.target.value)}
+                              className="h-7 text-[11px] pr-5 text-right font-semibold border-emerald-100"
+                            />
+                            <span className="absolute right-1.5 top-1.5 text-[9px] text-muted-foreground">万円</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="peakSalary" className="text-[9px] text-muted-foreground">ピーク時の想定年収</Label>
+                          <div className="relative">
+                            <Input
+                              id="peakSalary"
+                              type="text"
+                              inputMode="numeric"
+                              value={inputs.peakSalary === 0 ? "" : inputs.peakSalary}
+                              placeholder="0"
+                              onChange={(e) => handleInputChange('peakSalary', e.target.value)}
+                              className="h-7 text-[11px] pr-5 text-right font-semibold border-emerald-100"
+                            />
+                            <span className="absolute right-1.5 top-1.5 text-[9px] text-muted-foreground">万円</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[9px] text-muted-foreground">
+                          <Label htmlFor="workingYears">厚生年金加入期間（働く年数）</Label>
+                          <span className="font-bold text-emerald-700">{inputs.workingYears} 年</span>
+                        </div>
+                        <Slider
+                          id="workingYears-slider"
+                          min={10}
+                          max={50}
+                          step={1}
+                          value={[inputs.workingYears]}
+                          onValueChange={([val]) => handleInputChange('workingYears', val)}
+                          className="py-1"
+                        />
+                      </div>
+
+                      {/* 概算結果プレビュー */}
+                      <div className="bg-card p-2 rounded border border-emerald-100 flex items-center justify-between text-[10px]">
+                        <div>
+                          <p className="text-muted-foreground text-[9px] leading-none">想定される年金受給額（概算）</p>
+                          <p className="text-emerald-700 font-bold mt-1">
+                            月額 約 <strong className="text-xs">{estimatedPension.monthly}</strong> 万円
+                            <span className="text-[9px] text-muted-foreground font-normal ml-1">（年額 約 {estimatedPension.yearly}万円）</span>
+                          </p>
+                          {estimatedPension.isCapped && (
+                            <p className="text-[8px] text-amber-600 font-medium mt-0.5 leading-tight">
+                              ※平均年収が標準報酬上限（1,230万円）を超えたため、上限が適用されています。
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={applyEstimatedPension}
+                          className="h-6 text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 rounded"
+                        >
+                          結果を適用
+                        </Button>
+                      </div>
+                      <p className="text-[8px] text-muted-foreground leading-tight">
+                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（40年間満額納付を前提に年額80万円の満額で一律計算）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合は、下の「配偶者の年金も合算する」をオンにして、配偶者の年金額を別途入力してください。
+                      </p>
+                    </div>
+                  )}
+
                   {/* 配偶者の年金 */}
                   <div className="pt-2 flex items-center justify-between">
                     <Label htmlFor="hasSpouse" className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5 cursor-pointer">
@@ -811,104 +909,6 @@ export default function Home() {
                           </span>
                         )}
                       </div>
-                    </div>
-                  )}
-
-                  {/* 年金概算アコーディオントリガー */}
-                  <div className="pt-1 flex justify-end">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setShowEstimator(!showEstimator)}
-                      className="text-[10px] h-7 gap-1 px-2.5 border-emerald-200 hover:bg-emerald-50/50 text-emerald-700 hover:text-emerald-800"
-                    >
-                      <Calculator className="w-3 h-3" />
-                      {showEstimator ? "年収入力を閉じる" : "年収から概算する"}
-                    </Button>
-                  </div>
-
-                  {/* 年金概算ツール本体 */}
-                  {showEstimator && (
-                    <div className="mt-2 p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg space-y-2.5 transition-all duration-200">
-                      <h4 className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 leading-none">
-                        <UserCheck className="w-3.5 h-3.5" />
-                        公的年金（国民＋厚生年金）の簡易シミュレーター
-                      </h4>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor="initialSalary" className="text-[9px] text-muted-foreground">社会人最初の年収</Label>
-                          <div className="relative">
-                            <Input
-                              id="initialSalary"
-                              type="text"
-                              inputMode="numeric"
-                              value={inputs.initialSalary === 0 ? "" : inputs.initialSalary}
-                              placeholder="0"
-                              onChange={(e) => handleInputChange('initialSalary', e.target.value)}
-                              className="h-7 text-[11px] pr-5 text-right font-semibold border-emerald-100"
-                            />
-                            <span className="absolute right-1.5 top-1.5 text-[9px] text-muted-foreground">万円</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="peakSalary" className="text-[9px] text-muted-foreground">ピーク時の想定年収</Label>
-                          <div className="relative">
-                            <Input
-                              id="peakSalary"
-                              type="text"
-                              inputMode="numeric"
-                              value={inputs.peakSalary === 0 ? "" : inputs.peakSalary}
-                              placeholder="0"
-                              onChange={(e) => handleInputChange('peakSalary', e.target.value)}
-                              className="h-7 text-[11px] pr-5 text-right font-semibold border-emerald-100"
-                            />
-                            <span className="absolute right-1.5 top-1.5 text-[9px] text-muted-foreground">万円</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[9px] text-muted-foreground">
-                          <Label htmlFor="workingYears">厚生年金加入期間（働く年数）</Label>
-                          <span className="font-bold text-emerald-700">{inputs.workingYears} 年</span>
-                        </div>
-                        <Slider
-                          id="workingYears-slider"
-                          min={10}
-                          max={50}
-                          step={1}
-                          value={[inputs.workingYears]}
-                          onValueChange={([val]) => handleInputChange('workingYears', val)}
-                          className="py-1"
-                        />
-                      </div>
-
-                      {/* 概算結果プレビュー */}
-                      <div className="bg-card p-2 rounded border border-emerald-100 flex items-center justify-between text-[10px]">
-                        <div>
-                          <p className="text-muted-foreground text-[9px] leading-none">想定される年金受給額（概算）</p>
-                          <p className="text-emerald-700 font-bold mt-1">
-                            月額 約 <strong className="text-xs">{estimatedPension.monthly}</strong> 万円 
-                            <span className="text-[9px] text-muted-foreground font-normal ml-1">（年額 約 {estimatedPension.yearly}万円）</span>
-                          </p>
-                          {estimatedPension.isCapped && (
-                            <p className="text-[8px] text-amber-600 font-medium mt-0.5 leading-tight">
-                              ※平均年収が標準報酬上限（1,230万円）を超えたため、上限が適用されています。
-                            </p>
-                          )}
-                        </div>
-                        <Button 
-                          size="sm" 
-                          onClick={applyEstimatedPension}
-                          className="h-6 text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 rounded"
-                        >
-                          結果を適用
-                        </Button>
-                      </div>
-                      <p className="text-[8px] text-muted-foreground leading-tight">
-                        ※社会人最初の年収からピーク時年収まで直線的に年収が上がると仮定し、国民年金（40年間満額納付を前提に年額80万円の満額で一律計算）と厚生年金（平均標準報酬から算出）の合計を簡易的に算出しています。この概算はご本人お一人分の年金額です。配偶者がいる場合は、上の「配偶者の年金も合算する」をオンにして、配偶者の年金額を別途入力してください。
-                      </p>
                     </div>
                   )}
                 </div>
