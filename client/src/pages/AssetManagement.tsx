@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { Link } from "wouter";
+import * as XLSX from "xlsx";
 import { sanitizeNumericString } from "@/lib/utils";
 import Disclaimer from "@/components/Disclaimer";
+import DownloadButtons from "@/components/DownloadButtons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +57,9 @@ export default function AssetManagement() {
   React.useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // 画像ダウンロード時にキャプチャする対象（ページ全体）
+  const pageRef = useRef<HTMLDivElement>(null);
 
   // 共通設定：資産取り崩し開始 (X年後)
   const [yearsToRetire, setYearsToRetire] = useState<number>(30);
@@ -320,8 +325,56 @@ export default function AssetManagement() {
   const safeRatio = totalForRatio > 0 ? (finalYearData.safe / totalForRatio) * 100 : 0;
   const commodityRatio = totalForRatio > 0 ? (finalYearData.commodity / totalForRatio) * 100 : 0;
 
+  const assetClassLabel = (c: Asset["assetClass"]) =>
+    c === "risk" ? "リスク資産" : c === "safe" ? "安全資産" : "コモディティ";
+
+  // Excelダウンロード（スマホ用/PC用でファイル名のみ変える。
+  // データ内容自体は共通で、将来推移は画面表示の年数ピックアップではなく全期間を出力する）
+  const handleDownloadExcel = (orientation: "portrait" | "landscape") => {
+    const wb = XLSX.utils.book_new();
+
+    const assetHeader = ["資産名", "資産クラス", "現在保有価額(万円)", "積立種別", "想定積立額(万円)", "想定利回り(%)", "積立年数"];
+    const assetRows = assets.map(a => [
+      a.name,
+      assetClassLabel(a.assetClass),
+      a.currentValue,
+      a.contributionType === "monthly" ? "月額" : "年額",
+      a.contributionValue,
+      a.expectedReturn,
+      a.yearsToContribute,
+    ]);
+
+    const summaryRows: (string | number)[][] = [
+      ["項目", "値"],
+      ["共通設定：資産取り崩し開始（評価時点）", `${yearsToRetire}年後`],
+      [`${yearsToRetire}年後の将来予測結果（合計評価額）`, `${totalFinalValue}万円`],
+      ["投資元本累計", `${totalInvested}万円`],
+      ["運用益累計", `${totalEarnings}万円`],
+      ["運用倍率", totalInvested > 0 ? `${(totalFinalValue / totalInvested).toFixed(2)}倍` : "1.00倍"],
+      ["リスク資産（最終年）", `${finalYearData.risk}万円（${riskRatio.toFixed(1)}%）`],
+      ["安全資産（最終年）", `${finalYearData.safe}万円（${safeRatio.toFixed(1)}%）`],
+      ["コモディティ（最終年）", `${finalYearData.commodity}万円（${commodityRatio.toFixed(1)}%）`],
+    ];
+
+    const yearlyHeader = ["年", "リスク資産", "安全資産", "コモディティ", "合計評価額", "投資元本累計", "運用益累計"];
+    const yearlyRows = yearlyData.map(d => [d.year, d.risk, d.safe, d.commodity, d.total, d.invested, d.total - d.invested]);
+
+    const wsAssets = XLSX.utils.aoa_to_sheet([assetHeader, ...assetRows]);
+    wsAssets['!cols'] = assetHeader.map(() => ({ wch: 16 }));
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+    wsSummary['!cols'] = [{ wch: 36 }, { wch: 22 }];
+    const wsYearly = XLSX.utils.aoa_to_sheet([yearlyHeader, ...yearlyRows]);
+    wsYearly['!cols'] = yearlyHeader.map(() => ({ wch: 14 }));
+
+    XLSX.utils.book_append_sheet(wb, wsAssets, "資産一覧");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "サマリー");
+    XLSX.utils.book_append_sheet(wb, wsYearly, "年次推移（全期間）");
+
+    XLSX.writeFile(wb, `資産運用シミュレーション_${orientation === "portrait" ? "スマホ用" : "PC用"}.xlsx`);
+  };
+
   return (
-    <div className="min-h-screen bg-[oklch(0.99_0.003_40)] text-[oklch(0.25_0.01_50)] font-sans">
+    <div ref={pageRef} className="min-h-screen bg-[oklch(0.99_0.003_40)] text-[oklch(0.25_0.01_50)] font-sans">
       {/* 装飾用背景パターン */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,oklch(0.95_0.02_45_/_0.4),transparent_45%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,oklch(0.96_0.01_55_/_0.3),transparent_50%)] pointer-events-none" />
@@ -360,6 +413,11 @@ export default function AssetManagement() {
             保有中または積立予定の複数アセット（リスク資産、安全資産、コモディティ）を個別登録。
             将来の資産成長推移と目標アセットアロケーション比率を厳密にシミュレーションします。
           </p>
+        </div>
+
+        {/* 結果ダウンロード */}
+        <div className="max-w-3xl mx-auto mb-8">
+          <DownloadButtons captureRef={pageRef} filenameBase="資産運用シミュレーション" onDownloadExcel={handleDownloadExcel} />
         </div>
 
         {/* 共通設定エリア */}

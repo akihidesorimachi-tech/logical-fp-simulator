@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 import { sanitizeNumericString } from "@/lib/utils";
+import DownloadButtons from "@/components/DownloadButtons";
 import {
   Card, 
   CardContent, 
@@ -99,6 +101,9 @@ export default function Home() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // 画像ダウンロード時にキャプチャする対象（ページ全体）
+  const pageRef = useRef<HTMLDivElement>(null);
 
   // デフォルト入力値（「標準的な夫婦」プリセットと同じ値にしておく。
   // ここがプリセットの値とズレていると、初期表示でプリセットボタンが
@@ -398,8 +403,72 @@ export default function Home() {
     };
   }, [inputs]);
 
+  // Excelダウンロード（スマホ用/PC用でファイル名のみ変える。
+  // データ内容自体は共通で、老後期間の推移は画面表示の4行ピックアップではなく全期間を出力する）
+  const handleDownloadExcel = (orientation: "portrait" | "landscape") => {
+    const wb = XLSX.utils.book_new();
+
+    const inputRows: (string | number)[][] = [
+      ["項目", "値"],
+      ["A. 希望の生活費（月額）", `${inputs.livingCost}万円`],
+      ["B. 住宅費（月額）", `${inputs.housingCost}万円`],
+      ["C. ゆとり費（年額）", `${inputs.leisureCost}万円`],
+      ["D. 想定インフレ率（年率）", `${inputs.inflationRate}%`],
+      ["E. 現在年齢", `${inputs.currentAge}歳`],
+      ["F. 退職年齢", `${inputs.retirementAge}歳`],
+      ["G. 逝去年齢", `${inputs.deathAge}歳`],
+      ["H. 65歳受給の場合の想定年金受給額（月額・ご本人）", `${inputs.pensionIncome}万円`],
+      ["配偶者の年金を合算", inputs.hasSpouse ? "あり" : "なし"],
+      ...(inputs.hasSpouse ? [["配偶者の想定年金受給額（65歳受給の場合・月額）", `${inputs.spousePensionIncome}万円`]] : []),
+      ["退職年齢に応じた年金請求の補正", results.pensionAdjustmentFactor === 1
+        ? "補正なし（65歳で請求）"
+        : `${results.pensionClaimAge}歳で請求（65歳基準から${(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%${results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}）`],
+      ["補正後のご本人年金受給額（月額）", `${results.adjustedSelfPensionMonthly}万円`],
+      ...(inputs.hasSpouse ? [["補正後の配偶者年金受給額（月額）", `${results.adjustedSpousePensionMonthly}万円`]] : []),
+    ];
+
+    const summaryRows: (string | number)[][] = [
+      ["項目", "値（万円）"],
+      ["老後生活期間", `${results.retirementDuration}年間（${results.safeRetirementAge}歳〜${results.safeDeathAge}歳）`],
+      ["① 運用せず現金取り崩し：支出累計", results.totalCostNoInvestment],
+      ["① 運用せず現金取り崩し：自己準備必要額（差額）", results.netRequiredNoInvestment],
+      ["② 運用しながら取り崩す：運用調整支出額", results.totalCostWithInvestment],
+      ["② 運用しながら取り崩す：自己準備必要額（差額）", results.netRequiredWithInvestment],
+      ["年金受給総額（名目固定）", results.totalPensionNominal],
+      ["運用による削減効果", results.netInvestmentBenefit],
+    ];
+
+    const yearlyHeader = ["年齢", "経過年", "生活費(年)", "住宅費(年)", "ゆとり費(年)", "年間支出合計(インフレ後)", "年金(年額)", "年金累計", "①運用なし累計自己準備", "②運用あり累計自己準備", "運用効果(差)"];
+    const yearlyRows = results.chartData.map(d => [
+      d.age,
+      d.year,
+      d.livingCostYearly,
+      d.housingCostYearly,
+      d.leisureCostYearly,
+      d.totalCostYearly,
+      d.pensionYearly,
+      d.pensionCumulative,
+      d.netCashCumulative,
+      d.netInvestedCumulative,
+      d.netCashCumulative - d.netInvestedCumulative,
+    ]);
+
+    const wsInput = XLSX.utils.aoa_to_sheet(inputRows);
+    wsInput['!cols'] = [{ wch: 42 }, { wch: 28 }];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+    wsSummary['!cols'] = [{ wch: 42 }, { wch: 16 }];
+    const wsYearly = XLSX.utils.aoa_to_sheet([yearlyHeader, ...yearlyRows]);
+    wsYearly['!cols'] = yearlyHeader.map(() => ({ wch: 14 }));
+
+    XLSX.utils.book_append_sheet(wb, wsInput, "入力条件");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "サマリー");
+    XLSX.utils.book_append_sheet(wb, wsYearly, "年次推移（全期間）");
+
+    XLSX.writeFile(wb, `老後資金シミュレーション_${orientation === "portrait" ? "スマホ用" : "PC用"}.xlsx`);
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans-jp flex flex-col selection:bg-accent selection:text-accent-foreground">
+    <div ref={pageRef} className="min-h-screen bg-background text-foreground font-sans-jp flex flex-col selection:bg-accent selection:text-accent-foreground">
       {/* ヘッダー */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50 transition-all duration-200">
         <div className="container py-2 flex items-center justify-between">
@@ -465,6 +534,11 @@ export default function Home() {
               ゆとり充実 (月50万+旅・趣味)
             </Button>
           </div>
+        </div>
+
+        {/* 結果ダウンロード */}
+        <div className="max-w-3xl mx-auto mb-4">
+          <DownloadButtons captureRef={pageRef} filenameBase="老後資金シミュレーション" onDownloadExcel={handleDownloadExcel} />
         </div>
 
         {/* 警告表示 */}
