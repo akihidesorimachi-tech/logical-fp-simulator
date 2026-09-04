@@ -320,9 +320,11 @@ export default function Home() {
     const startLeisureCostYearly = leisureCost * inflationFactorAtRetirement;
     const startYearlyTotal = startLivingCostYearly + startHousingCostYearly + startLeisureCostYearly;
 
-    // 補正はご本人分（H）のみに適用し、配偶者分は入力値をそのまま使う
+    // 繰上げ・繰下げ補正は、配偶者の年金も同じ退職年齢(F)に合わせて請求するものとして
+    // ご本人分・配偶者分の両方に適用する（配偶者欄も「65歳受給の場合」の金額として入力）。
     const adjustedSelfPensionMonthly = pensionIncome * pensionAdjustmentFactor;
-    const totalMonthlyPension = adjustedSelfPensionMonthly + (hasSpouse ? spousePensionIncome : 0);
+    const adjustedSpousePensionMonthly = spousePensionIncome * pensionAdjustmentFactor;
+    const totalMonthlyPension = adjustedSelfPensionMonthly + (hasSpouse ? adjustedSpousePensionMonthly : 0);
     const pensionYearlyNominal = totalMonthlyPension * 12;
 
     const chartData: ChartDataPoint[] = [];
@@ -391,7 +393,8 @@ export default function Home() {
       pensionClaimAge,
       pensionAdjustmentFactor,
       pensionClaimMonthsFromBase,
-      adjustedSelfPensionMonthly: Math.round(adjustedSelfPensionMonthly * 10) / 10
+      adjustedSelfPensionMonthly: Math.round(adjustedSelfPensionMonthly * 10) / 10,
+      adjustedSpousePensionMonthly: Math.round(adjustedSpousePensionMonthly * 10) / 10
     };
   }, [inputs]);
 
@@ -721,7 +724,10 @@ export default function Home() {
                   {/* F. 退職年齢に合わせた繰上げ・繰下げ補正 */}
                   <div className="p-2 bg-amber-500/5 border border-amber-500/10 rounded text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed">
                     {results.pensionAdjustmentFactor === 1 ? (
-                      <span>F. 退職年齢は65歳のため、補正なしでそのまま月額 <strong>{inputs.pensionIncome}万円</strong> を適用します。</span>
+                      <span>
+                        F. 退職年齢は65歳のため、補正なしでそのまま月額 <strong>{inputs.pensionIncome}万円</strong> を適用します。
+                        {inputs.hasSpouse && <>（配偶者も同様に月額 <strong>{inputs.spousePensionIncome}万円</strong>）</>}
+                      </span>
                     ) : (
                       <span>
                         → F. 退職年齢（{results.safeRetirementAge}歳）で受給を開始すると、65歳基準から
@@ -729,6 +735,12 @@ export default function Home() {
                         となり、{results.pensionClaimMonthsFromBase < 0 ? "0.4" : "0.7"}%×{Math.abs(results.pensionClaimMonthsFromBase)}ヶ月＝
                         <strong>{(Math.abs(results.pensionAdjustmentFactor - 1) * 100).toFixed(1)}%{results.pensionClaimMonthsFromBase < 0 ? "減額" : "増額"}</strong>
                         されます。補正後のご本人受給額：<strong className="text-xs">{results.adjustedSelfPensionMonthly}万円/月</strong>
+                        {inputs.hasSpouse && (
+                          <>
+                            、配偶者受給額：<strong className="text-xs">{results.adjustedSpousePensionMonthly}万円/月</strong>
+                            （配偶者も同じ年齢で請求するものとして同率で補正）
+                          </>
+                        )}
                         {results.pensionClaimAge !== results.safeRetirementAge && (
                           <>
                             （{results.pensionClaimAge}歳で請求したものとして計算。
@@ -759,7 +771,7 @@ export default function Home() {
                     <div className="p-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-lg space-y-2">
                       <div className="flex justify-between items-center">
                         <Label htmlFor="spousePensionIncome" className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                          配偶者の想定年金受給額 (月額)
+                          配偶者の想定年金受給額（65歳受給の場合、月額）
                         </Label>
                         <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{inputs.spousePensionIncome} 万円/月</span>
                       </div>
