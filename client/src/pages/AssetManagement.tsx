@@ -690,15 +690,15 @@ export default function AssetManagement() {
 
           {/* 右カラム：シミュレーション結果 */}
           <div className="lg:col-span-6">
-            <Accordion type="single" collapsible className="border border-border rounded-lg shadow-sm bg-card overflow-hidden">
+            <Accordion type="single" collapsible>
               <AccordionItem value="results" className="border-none">
-                <AccordionTrigger className="bg-primary/5 hover:bg-primary/10 hover:no-underline px-4 py-3 [&>svg]:text-primary">
+                <AccordionTrigger className="w-full bg-primary/5 hover:bg-primary/10 hover:no-underline rounded-lg border border-border shadow-sm px-4 py-3 [&>svg]:text-primary">
                   <span className="flex items-center gap-1.5 text-sm font-bold text-foreground">
                     <TrendingUp className="w-4 h-4 text-primary" />
                     シミュレーション結果を表示する
                   </span>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 space-y-8">
+                <AccordionContent className="pt-6 space-y-8">
 
             {/* メインサマリーカード */}
             <Card className="border-border bg-gradient-to-br from-card to-primary/5 shadow-md overflow-hidden relative rounded-lg">
