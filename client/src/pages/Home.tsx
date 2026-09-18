@@ -29,6 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import Disclaimer from "@/components/Disclaimer";
 import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import {
   TrendingUp,
   HelpCircle,
   Coins,
@@ -1038,11 +1044,20 @@ export default function Home() {
           </div>
 
           {/* 右カラム: シミュレーション結果 (7/12) */}
-          <div className="lg:col-span-7 space-y-6">
-            
+          <div className="lg:col-span-7">
+            <Accordion type="single" collapsible className="border border-border/60 rounded-lg shadow-sm bg-card overflow-hidden">
+              <AccordionItem value="results" className="border-none">
+                <AccordionTrigger className="bg-primary/5 hover:bg-primary/10 hover:no-underline px-4 py-3 [&>svg]:text-primary">
+                  <span className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    シミュレーション結果を表示する
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 space-y-6">
+
             {/* メイン結果カード：現金 vs 運用の対比 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
+
               {/* 左：現金（運用なし）での自己準備額 */}
               <Card className="border-border/60 shadow-sm relative overflow-hidden bg-card">
                 <div className="absolute top-0 left-0 w-full h-1 bg-muted" />
@@ -1357,6 +1372,9 @@ export default function Home() {
               </CardContent>
             </Card>
 
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
         </div>

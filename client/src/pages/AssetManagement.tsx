@@ -3,6 +3,12 @@ import { Link } from "wouter";
 import { sanitizeNumericString } from "@/lib/utils";
 import Disclaimer from "@/components/Disclaimer";
 import DownloadButtons from "@/components/DownloadButtons";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import { MOBILE_CAPTURE_WIDTH, PC_CAPTURE_WIDTH } from "@/lib/downloadImage";
 import {
   BRAND,
@@ -683,8 +689,17 @@ export default function AssetManagement() {
           </div>
 
           {/* 右カラム：シミュレーション結果 */}
-          <div className="lg:col-span-6 space-y-8">
-            
+          <div className="lg:col-span-6">
+            <Accordion type="single" collapsible className="border border-border rounded-lg shadow-sm bg-card overflow-hidden">
+              <AccordionItem value="results" className="border-none">
+                <AccordionTrigger className="bg-primary/5 hover:bg-primary/10 hover:no-underline px-4 py-3 [&>svg]:text-primary">
+                  <span className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    シミュレーション結果を表示する
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 space-y-8">
+
             {/* メインサマリーカード */}
             <Card className="border-border bg-gradient-to-br from-card to-primary/5 shadow-md overflow-hidden relative rounded-lg">
               <CardHeader className="pb-2">
@@ -921,6 +936,9 @@ export default function AssetManagement() {
               </CardContent>
             </Card>
 
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
         </div>
