@@ -585,11 +585,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 結果ダウンロード */}
-        <div className="max-w-3xl mx-auto mb-4">
-          <DownloadButtons captureRefs={{ mobile: mobileReportRef, pc: pcReportRef }} filenameBase="老後資金シミュレーション" onDownloadExcel={handleDownloadExcel} />
-        </div>
-
         {/* 警告表示 */}
         {ageValidationWarning && (
           <div className="max-w-6xl mx-auto mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2 text-amber-800 dark:text-amber-300 text-xs">
@@ -1375,6 +1370,11 @@ export default function Home() {
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+
+            {/* 結果ダウンロード */}
+            <div className="mt-4">
+              <DownloadButtons captureRefs={{ mobile: mobileReportRef, pc: pcReportRef }} filenameBase="老後資金シミュレーション" onDownloadExcel={handleDownloadExcel} />
+            </div>
           </div>
 
         </div>

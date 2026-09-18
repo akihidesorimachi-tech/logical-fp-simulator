@@ -454,11 +454,6 @@ export default function AssetManagement() {
           </p>
         </div>
 
-        {/* 結果ダウンロード */}
-        <div className="max-w-3xl mx-auto mb-8">
-          <DownloadButtons captureRefs={{ mobile: mobileReportRef, pc: pcReportRef }} filenameBase="資産運用シミュレーション" onDownloadExcel={handleDownloadExcel} />
-        </div>
-
         {/* 共通設定エリア */}
         <Card className="border-border bg-primary/5 shadow-inner mb-8 rounded-lg">
           <CardContent className="p-6">
@@ -939,6 +934,11 @@ export default function AssetManagement() {
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+
+            {/* 結果ダウンロード */}
+            <div className="mt-4">
+              <DownloadButtons captureRefs={{ mobile: mobileReportRef, pc: pcReportRef }} filenameBase="資産運用シミュレーション" onDownloadExcel={handleDownloadExcel} />
+            </div>
           </div>
 
         </div>
