@@ -589,39 +589,38 @@ export default function Home() {
               <CardContent className="p-4 space-y-4">
 
                 {/* モデルケース適用・リセット */}
-                <div className="space-y-2 pb-2 border-b border-border/40">
-                  <Label className="text-xs font-bold text-foreground/90">モデルケースを適用する</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button
-                      variant={inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => applyPreset('standard')}
-                      className="text-[10px] h-7 px-3 rounded-full transition-all"
-                    >
-                      標準的な夫婦 (月30万+ゆとり)
-                    </Button>
-                    <Button
-                      variant={inputs.livingCost === 15 && inputs.leisureCost === 20 ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => applyPreset('frugal')}
-                      className="text-[10px] h-7 px-3 rounded-full transition-all"
-                    >
-                      シンプルライフ (月20万+ミニマム)
-                    </Button>
-                    <Button
-                      variant={inputs.livingCost === 35 && inputs.leisureCost === 120 ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => applyPreset('luxurious')}
-                      className="text-[10px] h-7 px-3 rounded-full transition-all"
-                    >
-                      ゆとり充実 (月50万+旅・趣味)
-                    </Button>
+                <div className="space-y-2.5 pb-3 border-b border-border/40">
+                  <Label className="text-xs font-bold text-foreground/90 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    モデルケースを適用する
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {([
+                      { type: 'standard', Icon: Users, title: '標準的な夫婦', sub: '月30万+ゆとり', selected: inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 },
+                      { type: 'frugal', Icon: Wallet, title: 'シンプルライフ', sub: '月20万+ミニマム', selected: inputs.livingCost === 15 && inputs.leisureCost === 20 },
+                      { type: 'luxurious', Icon: Sparkles, title: 'ゆとり充実', sub: '月50万+旅・趣味', selected: inputs.livingCost === 35 && inputs.leisureCost === 120 },
+                    ] as const).map(({ type, Icon, title, sub, selected }) => (
+                      <Button
+                        key={type}
+                        variant={selected ? "default" : "outline"}
+                        onClick={() => applyPreset(type)}
+                        className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left rounded-lg whitespace-normal"
+                      >
+                        <span className="flex items-center gap-1.5 text-xs font-bold">
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                          {title}
+                        </span>
+                        <span className={`text-[11px] font-normal ${selected ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
+                          {sub}
+                        </span>
+                      </Button>
+                    ))}
                   </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={resetInputs}
-                    className="text-[10px] h-7 gap-1 px-3 rounded-full transition-all text-muted-foreground hover:text-foreground"
+                    className="w-full gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-muted-foreground/40 rounded-lg"
                   >
                     <RotateCcw className="w-3 h-3" />
                     リセット（条件設定をすべて0に戻す）
