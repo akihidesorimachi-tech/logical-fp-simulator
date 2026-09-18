@@ -48,7 +48,8 @@ import {
   Calculator,
   UserCheck,
   Users,
-  ArrowLeft
+  ArrowLeft,
+  RotateCcw
 } from "lucide-react";
 import { Link } from "wouter";
 import { 
@@ -90,6 +91,23 @@ interface CalculationInputs {
 // 配偶者が基礎年金（国民年金）のみを受給する場合の月額目安
 // （40年間満額納付した場合の満額年額80万円 ÷ 12ヶ月、四捨五入）
 const SPOUSE_BASIC_PENSION_ONLY_MONTHLY = Math.round(80 / 12);
+
+// 条件設定の初期値・リセット値（未入力の状態を表すため全項目0）
+const ZERO_INPUTS: CalculationInputs = {
+  livingCost: 0,
+  housingCost: 0,
+  leisureCost: 0,
+  inflationRate: 0,
+  currentAge: 0,
+  retirementAge: 0,
+  deathAge: 0,
+  pensionIncome: 0,
+  hasSpouse: false,
+  spousePensionIncome: 0,
+  initialSalary: 0,
+  peakSalary: 0,
+  workingYears: 0,
+};
 
 // グラフ用データの型定義
 interface ChartDataPoint {
@@ -137,26 +155,8 @@ export default function Home() {
   const mobileReportRef = useRef<HTMLDivElement>(null);
   const pcReportRef = useRef<HTMLDivElement>(null);
 
-  // デフォルト入力値（「標準的な夫婦」プリセットと同じ値にしておく。
-  // ここがプリセットの値とズレていると、初期表示でプリセットボタンが
-  // 選択中に見えるのに実際の値が違う、という食い違いが起きるため）
-  const [inputs, setInputs] = useState<CalculationInputs>({
-    livingCost: 22,      // 22万円
-    housingCost: 7,      // 7万円
-    leisureCost: 50,     // 50万円
-    inflationRate: 1.5,  // 1.5%
-    currentAge: 35,      // 35歳
-    retirementAge: 65,   // 65歳
-    deathAge: 95,        // 95歳
-    pensionIncome: 16,   // 年金16万円/月（年収から概算する場合の初任給300万/ピーク700万/40年の概算値と一致）
-    hasSpouse: true,          // 「標準的な夫婦」なので配偶者ありを初期状態に
-    spousePensionIncome: SPOUSE_BASIC_PENSION_ONLY_MONTHLY,   // 配偶者は基礎年金のみ（専業主婦等）を想定した概算値
-
-    // 年金概算用の初期値
-    initialSalary: 300,  // 社会人最初の年収 300万
-    peakSalary: 700,     // ピーク時の年収 700万
-    workingYears: 40,    // 40年間勤務
-  });
+  // 初期値は未入力状態（全項目0）。モデルケースを選ぶか、手動で入力してもらう
+  const [inputs, setInputs] = useState<CalculationInputs>(ZERO_INPUTS);
 
   const [showEstimator, setShowEstimator] = useState(false);
 
@@ -294,6 +294,13 @@ export default function Home() {
         });
         break;
     }
+  };
+
+  // 条件設定をすべて未入力状態（0）に戻す
+  const resetInputs = () => {
+    setInflationRateDraft(null);
+    setShowEstimator(false);
+    setInputs(ZERO_INPUTS);
   };
 
   // 入力値の整合性チェック
@@ -554,35 +561,6 @@ export default function Home() {
           <p className="text-muted-foreground text-xs md:text-sm max-w-2xl mx-auto leading-relaxed">
             将来の期待インフレ（物価上昇）と、<strong className="text-foreground">インフレに連動しない公的年金（実質価値目減り）</strong>の影響を厳密に考慮し、必要資金を算出します。
           </p>
-
-          {/* プリセット選択 */}
-          <div className="flex flex-wrap justify-center gap-1.5 pt-1">
-            <span className="text-[11px] text-muted-foreground flex items-center mr-1">モデルケース:</span>
-            <Button
-              variant={inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 ? "default" : "outline"}
-              size="sm"
-              onClick={() => applyPreset('standard')}
-              className="text-[10px] h-7 px-3 rounded-full transition-all"
-            >
-              標準的な夫婦 (月30万+ゆとり)
-            </Button>
-            <Button 
-              variant={inputs.livingCost === 15 && inputs.leisureCost === 20 ? "default" : "outline"} 
-              size="sm" 
-              onClick={() => applyPreset('frugal')}
-              className="text-[10px] h-7 px-3 rounded-full transition-all"
-            >
-              シンプルライフ (月20万+ミニマム)
-            </Button>
-            <Button 
-              variant={inputs.livingCost === 35 && inputs.leisureCost === 120 ? "default" : "outline"} 
-              size="sm" 
-              onClick={() => applyPreset('luxurious')}
-              className="text-[10px] h-7 px-3 rounded-full transition-all"
-            >
-              ゆとり充実 (月50万+旅・趣味)
-            </Button>
-          </div>
         </div>
 
         {/* 警告表示 */}
@@ -610,6 +588,46 @@ export default function Home() {
               </CardHeader>
               <CardContent className="p-4 space-y-4">
 
+                {/* モデルケース適用・リセット */}
+                <div className="space-y-2 pb-2 border-b border-border/40">
+                  <Label className="text-xs font-bold text-foreground/90">モデルケースを適用する</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      variant={inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => applyPreset('standard')}
+                      className="text-[10px] h-7 px-3 rounded-full transition-all"
+                    >
+                      標準的な夫婦 (月30万+ゆとり)
+                    </Button>
+                    <Button
+                      variant={inputs.livingCost === 15 && inputs.leisureCost === 20 ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => applyPreset('frugal')}
+                      className="text-[10px] h-7 px-3 rounded-full transition-all"
+                    >
+                      シンプルライフ (月20万+ミニマム)
+                    </Button>
+                    <Button
+                      variant={inputs.livingCost === 35 && inputs.leisureCost === 120 ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => applyPreset('luxurious')}
+                      className="text-[10px] h-7 px-3 rounded-full transition-all"
+                    >
+                      ゆとり充実 (月50万+旅・趣味)
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetInputs}
+                    className="text-[10px] h-7 gap-1 px-3 rounded-full transition-all text-muted-foreground hover:text-foreground"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    リセット（条件設定をすべて0に戻す）
+                  </Button>
+                </div>
+
                 <p className="text-xs text-muted-foreground">老後の支出の想定を入力してください</p>
 
                 {/* A. 希望の生活費 */}
@@ -634,7 +652,7 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <Slider
                       id="livingCost-slider"
-                      min={5}
+                      min={0}
                       max={100}
                       step={1}
                       value={[inputs.livingCost]}
