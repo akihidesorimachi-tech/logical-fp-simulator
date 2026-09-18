@@ -609,7 +609,9 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
-                
+
+                <p className="text-xs text-muted-foreground">老後の支出の想定を入力してください</p>
+
                 {/* A. 希望の生活費 */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
@@ -649,6 +651,9 @@ export default function Home() {
                       className="w-16 h-8 text-xs text-right font-semibold"
                     />
                   </div>
+                  <p className="text-[10px] text-muted-foreground leading-none">
+                    食費や水道光熱費や衣類等、普通の生活を送る上で必要な住宅関連以外の出費
+                  </p>
                 </div>
 
                 {/* B. 住宅費 */}
