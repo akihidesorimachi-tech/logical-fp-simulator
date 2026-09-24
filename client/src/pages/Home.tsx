@@ -109,6 +109,16 @@ const ZERO_INPUTS: CalculationInputs = {
   workingYears: 0,
 };
 
+// 画面初期表示時の値。E〜G（年齢設定）は0のままだと即座に警告が出て
+// 使い始めにくいため、以前からの目安値を残す。それ以外はモデルケースか
+// 手入力で埋めてもらうため0のまま
+const INITIAL_INPUTS: CalculationInputs = {
+  ...ZERO_INPUTS,
+  currentAge: 35,
+  retirementAge: 65,
+  deathAge: 95,
+};
+
 // グラフ用データの型定義
 interface ChartDataPoint {
   age: number;
@@ -155,8 +165,8 @@ export default function Home() {
   const mobileReportRef = useRef<HTMLDivElement>(null);
   const pcReportRef = useRef<HTMLDivElement>(null);
 
-  // 初期値は未入力状態（全項目0）。モデルケースを選ぶか、手動で入力してもらう
-  const [inputs, setInputs] = useState<CalculationInputs>(ZERO_INPUTS);
+  // 初期値は未入力状態に近いが、E〜G（年齢設定）だけは以前の目安値を残す
+  const [inputs, setInputs] = useState<CalculationInputs>(INITIAL_INPUTS);
 
   const [showEstimator, setShowEstimator] = useState(false);
 
@@ -596,25 +606,43 @@ export default function Home() {
                   </Label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {([
-                      { type: 'standard', Icon: Users, title: '標準的な夫婦', sub: '月30万+ゆとり', selected: inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 },
-                      { type: 'frugal', Icon: Wallet, title: 'シンプルライフ', sub: '月20万+ミニマム', selected: inputs.livingCost === 15 && inputs.leisureCost === 20 },
-                      { type: 'luxurious', Icon: Sparkles, title: 'ゆとり充実', sub: '月50万+旅・趣味', selected: inputs.livingCost === 35 && inputs.leisureCost === 120 },
-                    ] as const).map(({ type, Icon, title, sub, selected }) => (
-                      <Button
-                        key={type}
-                        variant={selected ? "default" : "outline"}
-                        onClick={() => applyPreset(type)}
-                        className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left rounded-lg whitespace-normal"
-                      >
-                        <span className="flex items-center gap-1.5 text-xs font-bold">
-                          <Icon className="w-3.5 h-3.5 shrink-0" />
-                          {title}
-                        </span>
-                        <span className={`text-[11px] font-normal ${selected ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
-                          {sub}
-                        </span>
-                      </Button>
-                    ))}
+                      { type: 'standard', Icon: Users, title: '標準的な夫婦', sub: '月30万+ゆとり', color: 'primary', selected: inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 },
+                      { type: 'frugal', Icon: Wallet, title: 'シンプルライフ', sub: '月20万+ミニマム', color: 'emerald', selected: inputs.livingCost === 15 && inputs.leisureCost === 20 },
+                      { type: 'luxurious', Icon: Sparkles, title: 'ゆとり充実', sub: '月50万+旅・趣味', color: 'amber', selected: inputs.livingCost === 35 && inputs.leisureCost === 120 },
+                    ] as const).map(({ type, Icon, title, sub, color, selected }) => {
+                      const colorClass = {
+                        primary: selected
+                          ? "bg-primary border-primary text-primary-foreground hover:bg-primary/90"
+                          : "border-border text-foreground hover:bg-primary/5 hover:border-primary/40",
+                        emerald: selected
+                          ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700"
+                          : "border-emerald-200 text-emerald-700 hover:bg-emerald-50/60 dark:border-emerald-900 dark:text-emerald-400",
+                        amber: selected
+                          ? "bg-amber-500 border-amber-500 text-white hover:bg-amber-600"
+                          : "border-amber-200 text-amber-700 hover:bg-amber-50/60 dark:border-amber-900 dark:text-amber-400",
+                      }[color];
+                      const subClass = {
+                        primary: selected ? "text-primary-foreground/75" : "text-muted-foreground",
+                        emerald: selected ? "text-white/80" : "text-emerald-700/70 dark:text-emerald-400/70",
+                        amber: selected ? "text-white/80" : "text-amber-700/70 dark:text-amber-400/70",
+                      }[color];
+                      return (
+                        <Button
+                          key={type}
+                          variant="outline"
+                          onClick={() => applyPreset(type)}
+                          className={`h-auto flex-col items-start gap-0.5 px-3 py-2 text-left rounded-lg whitespace-normal ${colorClass}`}
+                        >
+                          <span className="flex items-center gap-1.5 text-xs font-bold">
+                            <Icon className="w-3.5 h-3.5 shrink-0" />
+                            {title}
+                          </span>
+                          <span className={`text-[11px] font-normal ${subClass}`}>
+                            {sub}
+                          </span>
+                        </Button>
+                      );
+                    })}
                   </div>
                   <Button
                     variant="ghost"
