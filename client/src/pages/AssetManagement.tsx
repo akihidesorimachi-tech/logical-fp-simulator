@@ -467,7 +467,7 @@ export default function AssetManagement() {
                   追加したすべての資産が、ここで設定した「X年後」にいくらになっているかを一括計算します。
                 </p>
               </div>
-              <div className="flex items-center gap-4 min-w-[280px] md:min-w-[350px]">
+              <div className="flex items-center gap-4 w-full md:w-auto md:min-w-[350px]">
                 <Slider
                   value={[yearsToRetire]}
                   onValueChange={(val) => handleYearsToRetireChange(val[0])}
