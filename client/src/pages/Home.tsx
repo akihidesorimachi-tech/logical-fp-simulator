@@ -306,11 +306,11 @@ export default function Home() {
     }
   };
 
-  // 条件設定をすべて未入力状態（0）に戻す
+  // 条件設定を初期値に戻す
   const resetInputs = () => {
     setInflationRateDraft(null);
     setShowEstimator(false);
-    setInputs(ZERO_INPUTS);
+    setInputs(INITIAL_INPUTS);
   };
 
   // 入力値の整合性チェック
@@ -651,7 +651,7 @@ export default function Home() {
                     className="w-full gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-muted-foreground/40 rounded-lg"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    リセット（条件設定をすべて0に戻す）
+                    リセット（条件設定を初期値に戻す）
                   </Button>
                 </div>
 
@@ -948,7 +948,7 @@ export default function Home() {
                               value={inputs.initialSalary === 0 ? "" : inputs.initialSalary}
                               placeholder="0"
                               onChange={(e) => handleInputChange('initialSalary', e.target.value)}
-                              className="h-7 text-[11px] pr-5 text-right font-semibold border-emerald-100"
+                              className="h-7 text-[11px] pr-9 text-right font-semibold border-emerald-100"
                             />
                             <span className="absolute right-1.5 top-1.5 text-[9px] text-muted-foreground">万円</span>
                           </div>
@@ -963,7 +963,7 @@ export default function Home() {
                               value={inputs.peakSalary === 0 ? "" : inputs.peakSalary}
                               placeholder="0"
                               onChange={(e) => handleInputChange('peakSalary', e.target.value)}
-                              className="h-7 text-[11px] pr-5 text-right font-semibold border-emerald-100"
+                              className="h-7 text-[11px] pr-9 text-right font-semibold border-emerald-100"
                             />
                             <span className="absolute right-1.5 top-1.5 text-[9px] text-muted-foreground">万円</span>
                           </div>
