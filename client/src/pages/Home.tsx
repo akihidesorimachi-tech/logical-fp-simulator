@@ -604,7 +604,7 @@ export default function Home() {
                     <Sparkles className="w-3.5 h-3.5 text-primary" />
                     モデルケースを適用する
                   </Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {([
                       { type: 'standard', Icon: Users, title: '標準的な夫婦', sub: '月30万+ゆとり', color: 'primary', selected: inputs.livingCost === 22 && inputs.housingCost === 7 && inputs.leisureCost === 50 },
                       { type: 'frugal', Icon: Wallet, title: 'シンプルライフ', sub: '月20万+ミニマム', color: 'emerald', selected: inputs.livingCost === 15 && inputs.leisureCost === 20 },
@@ -631,13 +631,13 @@ export default function Home() {
                           key={type}
                           variant="outline"
                           onClick={() => applyPreset(type)}
-                          className={`h-auto flex-col items-start gap-0.5 px-3 py-2 text-left rounded-lg whitespace-normal ${colorClass}`}
+                          className={`h-auto flex-col items-center justify-start gap-1 px-1.5 py-2.5 text-center rounded-lg whitespace-normal ${colorClass}`}
                         >
-                          <span className="flex items-center gap-1.5 text-xs font-bold">
-                            <Icon className="w-3.5 h-3.5 shrink-0" />
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span className="text-[11px] font-bold leading-tight text-balance">
                             {title}
                           </span>
-                          <span className={`text-[11px] font-normal ${subClass}`}>
+                          <span className={`text-[10px] font-normal leading-tight text-balance ${subClass}`}>
                             {sub}
                           </span>
                         </Button>
