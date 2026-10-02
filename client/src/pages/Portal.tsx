@@ -18,7 +18,7 @@ export default function Portal() {
       <header className="border-b border-border bg-white/80 backdrop-blur-md py-3 relative z-10">
         <div className="container flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" className="h-10 object-contain" />
+            <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" width={42} height={40} className="h-10 object-contain" />
             <div className="h-6 w-[1px] bg-border" />
             <span className="text-xs font-bold text-muted-foreground tracking-wider">1st-CLASS FP SYSTEM</span>
           </div>

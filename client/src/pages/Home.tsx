@@ -545,7 +545,7 @@ export default function Home() {
             </Link>
             <div className="h-4 w-[1px] bg-border" />
             <div className="flex items-center gap-2">
-              <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" className="h-8 object-contain" />
+              <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" width={34} height={32} className="h-8 object-contain" />
               <div className="h-4 w-[1px] bg-border" />
               <div>
                 <h1 className="text-xs font-bold text-foreground">老後必要資金計算システム</h1>
@@ -1454,7 +1454,7 @@ export default function Home() {
               {/* ヘッダー */}
               <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-primary mb-6">
                 <div className="flex items-center gap-3">
-                  <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" className="h-10 object-contain" />
+                  <img src={`${import.meta.env.BASE_URL}assets/logical-fp-logo.jpeg`} alt="LOGICAL FP" width={42} height={40} className="h-10 object-contain" />
                   <div className="h-8 w-[1px] bg-border" />
                   <div>
                     <h2 className={`${isPc ? "text-lg" : "text-base"} font-bold text-foreground leading-tight`}>老後必要資金シミュレーション結果</h2>
