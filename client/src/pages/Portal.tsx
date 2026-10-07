@@ -1,14 +1,65 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, Landmark, Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Calculator, TrendingUp, Landmark, Sparkles, ArrowRight, ShieldCheck, ShieldAlert } from "lucide-react";
 import Disclaimer from "@/components/Disclaimer";
 
+const SNS_CONSENT_KEY = "lfp-sns-share-consent-v1";
+
 export default function Portal() {
+  const [consentOpen, setConsentOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SNS_CONSENT_KEY) !== "1";
+    } catch {
+      return true;
+    }
+  });
+
+  const handleAgree = () => {
+    try {
+      localStorage.setItem(SNS_CONSENT_KEY, "1");
+    } catch {
+      // プライベートモード等でlocalStorageが使えない場合は、次回表示を許容する
+    }
+    setConsentOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-[oklch(0.99_0.003_40)] text-[oklch(0.25_0.01_50)] font-sans flex flex-col relative overflow-hidden">
-      
+
+      {/* SNS転載禁止の同意ワーニング（初回アクセス時のみ、同意するまで先に進めない） */}
+      <AlertDialog open={consentOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-base">
+              <ShieldAlert className="w-5 h-5 text-destructive shrink-0" />
+              ご利用にあたっての注意事項
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-left text-xs leading-relaxed space-y-2 pt-1">
+                <p>本ツールの画面キャプチャ・試算結果画像・URL等を、SNSやブログ等の第三者への無断転載・再配布することを禁止します。</p>
+                <p>本ツールはご本人のライフプラン検討を目的とした個人利用専用です。内容にご同意のうえご利用ください。</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleAgree} className="w-full sm:w-auto">
+              同意して利用を開始する
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* 装飾用背景パターン */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,oklch(0.95_0.02_45_/_0.4),transparent_45%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,oklch(0.96_0.01_55_/_0.3),transparent_50%)] pointer-events-none" />
