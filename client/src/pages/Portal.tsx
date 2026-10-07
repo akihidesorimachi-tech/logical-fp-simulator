@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -34,6 +35,10 @@ export default function Portal() {
     setConsentOpen(false);
   };
 
+  const handleDecline = () => {
+    window.location.href = "https://www.google.com/";
+  };
+
   return (
     <div className="min-h-screen bg-[oklch(0.99_0.003_40)] text-[oklch(0.25_0.01_50)] font-sans flex flex-col relative overflow-hidden">
 
@@ -53,6 +58,9 @@ export default function Portal() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDecline} className="w-full sm:w-auto">
+              同意しない
+            </AlertDialogCancel>
             <AlertDialogAction onClick={handleAgree} className="w-full sm:w-auto">
               同意して利用を開始する
             </AlertDialogAction>
